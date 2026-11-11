@@ -2,13 +2,12 @@
 
 use serde::{Deserialize, Serialize};
 
-/// The reporting server. The secret is not here: it belongs to the stick (see `StickConfig`).
+/// The stick's secret is not here; it belongs to the stick (see `StickConfig`).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Api {
-    /// Base URL of the Hub, such as `https://hub.example.org`. Empty means no reporting.
+    /// Base URL of the Hub. Empty means no reporting.
     pub url: String,
-    /// Seconds between heartbeats.
     pub heartbeat_s: u64,
 }
 
@@ -21,7 +20,6 @@ impl Default for Api {
     }
 }
 
-/// Whether the text is an `http://` or `https://` address with a host and no spaces.
 #[must_use]
 pub fn is_valid_http_url(url: &str) -> bool {
     let Some(rest) = url

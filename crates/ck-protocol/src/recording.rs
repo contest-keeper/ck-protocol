@@ -4,26 +4,20 @@ use serde::{Deserialize, Serialize};
 
 use crate::time::LocalDateTime;
 
-/// How much the stick records.
+/// The modes of the `ck-recorder` service.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum RecordingMode {
-    /// No recording.
     Off,
-    /// One picture every few seconds. The cheapest option.
     Snapshots,
-    /// 1 frame per second at half resolution.
     #[default]
     Low,
-    /// 2 frames per second at full resolution.
     Standard,
 }
 
 impl RecordingMode {
-    /// Every mode, from cheapest to most expensive.
     pub const ALL: [Self; 4] = [Self::Off, Self::Snapshots, Self::Low, Self::Standard];
 
-    /// The mode's name as written in the settings and in `/etc/ck/recording.conf`.
     #[must_use]
     pub fn as_str(self) -> &'static str {
         match self {
@@ -35,18 +29,16 @@ impl RecordingMode {
     }
 }
 
-/// When and how the stick records.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Recording {
-    /// How much to record.
     pub mode: RecordingMode,
-    /// Seconds to wait after the desktop appears, so the boot and login stay fast.
+    /// Seconds to wait after the desktop appears, so boot and login stay fast.
     pub start_delay_s: u64,
     /// Do not start before this time, by the machine's clock.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub start_at: Option<LocalDateTime>,
-    /// Seconds between pictures in `snapshots` mode. The recorder uses 10 when this is left out.
+    /// The recorder uses 10 seconds when this is left out.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub snapshot_interval_s: Option<u64>,
 }

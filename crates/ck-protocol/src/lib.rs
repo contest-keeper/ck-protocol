@@ -29,11 +29,6 @@ pub use settings::{ESP_CONFIG_DIR, ESP_CONFIG_FILE, SCHEMA, Settings, StickConfi
 pub use time::{LocalDateTime, ParseLocalDateTimeError};
 pub use validation::Problem;
 
-/// HTTP header that carries the stick's id.
 pub const STICK_HEADER: &str = "X-CK-Stick";
-
-/// HTTP header that carries the signature of the request body.
 pub const SIGNATURE_HEADER: &str = "X-CK-Signature";
-
-/// Path the stick sends heartbeats to, below the Hub's address.
 pub const HEARTBEAT_PATH: &str = "/api/v1/heartbeat";

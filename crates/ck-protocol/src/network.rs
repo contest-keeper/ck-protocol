@@ -2,11 +2,10 @@
 
 use serde::{Deserialize, Serialize};
 
-/// The proxy's allowlist.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Network {
-    /// Sites the contestant may open. `example.org` or `.example.org` (with all subdomains).
+    /// `example.org`, or `.example.org` to include subdomains.
     pub allowed_domains: Vec<String>,
 }
 
@@ -26,9 +25,7 @@ impl Default for Network {
     }
 }
 
-/// Whether the text is a site name: `example.org` or `.example.org`.
-///
-/// It needs at least two parts made of ASCII letters, digits and `-`, none of them empty.
+/// At least two parts of ASCII letters, digits and `-`, with an optional leading dot.
 #[must_use]
 pub fn is_valid_domain(domain: &str) -> bool {
     let name = domain.strip_prefix('.').unwrap_or(domain);

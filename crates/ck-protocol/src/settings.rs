@@ -10,33 +10,23 @@ use crate::network::Network;
 use crate::recording::Recording;
 use crate::time::LocalDateTime;
 
-/// The version of the settings file written by this crate.
 pub const SCHEMA: u32 = 1;
 
-/// Folder of the settings on the EFI partition.
 pub const ESP_CONFIG_DIR: &str = "ck";
 
-/// File name of the settings inside [`ESP_CONFIG_DIR`].
 pub const ESP_CONFIG_FILE: &str = "config.json";
 
-/// Everything an admin chooses for a contest. The same settings go on every stick of the contest.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Settings {
-    /// The contest.
     pub contest: Contest,
-    /// Name of the team these sticks belong to. Used for computer names and in reports.
     pub team: String,
-    /// Name of the venue or lab.
     pub site: String,
-    /// What contestants see on the machine.
     pub branding: Branding,
-    /// Which sites may be opened. Written at the top level of the file.
+    /// Written at the top level of the file.
     #[serde(flatten)]
     pub network: Network,
-    /// Screen recording.
     pub recording: Recording,
-    /// Where the stick reports to.
     pub api: Api,
 }
 
@@ -54,18 +44,14 @@ impl Default for Settings {
     }
 }
 
-/// The file `ck/config.json`: the admin's settings plus the identity of one stick.
+/// `ck/config.json`: the admin's settings plus the identity of one stick.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct StickConfig {
-    /// The version of this file's format. See [`SCHEMA`].
     pub schema: u32,
-    /// Which stick this is.
     pub stick_id: StickId,
-    /// When the admin tool made the file, by the admin's clock.
     pub created_at: LocalDateTime,
-    /// The stick's secret. Only the admin tool's registry and the stick itself hold it.
+    /// Held only by the admin tool's registry and the stick itself.
     pub token: Token,
-    /// The settings, written at the top level of the file.
     #[serde(flatten)]
     pub settings: Settings,
 }
@@ -75,7 +61,7 @@ mod tests {
     use super::*;
     use crate::recording::RecordingMode;
 
-    /// A file in the layout of the Python prototype, with the stick's secret moved to the top level.
+    /// A file in the Python prototype's layout, with the secret moved to the top level.
     const SAMPLE: &str = r#"{
         "schema": 1,
         "stick_id": "03c9f556",

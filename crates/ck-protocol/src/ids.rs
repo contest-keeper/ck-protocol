@@ -4,13 +4,10 @@ use std::fmt;
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-/// The identity of one stick, made by the admin tool, such as `03c9f556`.
-///
-/// It is 1 to 64 characters: ASCII letters, digits and `-`. It travels in the `X-CK-Stick` header.
+/// 1 to 64 ASCII letters, digits or `-`. Sent in the `X-CK-Stick` header.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct StickId(String);
 
-/// The text is not a valid stick id.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 #[error("a stick id has 1 to 64 letters, digits or '-' (got '{0}')")]
 pub struct InvalidStickId(String);
@@ -18,10 +15,6 @@ pub struct InvalidStickId(String);
 impl StickId {
     const MAX_LENGTH: usize = 64;
 
-    /// Checks the text once; after that the type can be trusted.
-    ///
-    /// # Errors
-    /// Returns an error when the text is empty, longer than 64 characters or has other characters.
     pub fn parse(text: &str) -> Result<Self, InvalidStickId> {
         let valid = !text.is_empty()
             && text.len() <= Self::MAX_LENGTH
@@ -33,7 +26,6 @@ impl StickId {
         }
     }
 
-    /// The id as text.
     #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
@@ -59,22 +51,18 @@ impl<'de> Deserialize<'de> for StickId {
     }
 }
 
-/// The secret of one stick. Reports are signed with it.
-///
-/// It has no `Display` and its `Debug` output is hidden, so it cannot end up in a log by accident.
-/// Use [`Token::expose`] only where the secret is really needed, for example to sign.
+/// The stick's secret. It has no `Display` and its `Debug` hides the value, so it cannot reach a log by accident.
+/// Call `expose` only where the secret is needed, for example to sign.
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct Token(String);
 
 impl Token {
-    /// Wraps a secret.
     #[must_use]
     pub fn new(secret: impl Into<String>) -> Self {
         Self(secret.into())
     }
 
-    /// The secret itself. Never log it.
     #[must_use]
     pub fn expose(&self) -> &str {
         &self.0

@@ -2,34 +2,26 @@
 
 use serde::{Deserialize, Serialize};
 
-/// A link in the browser's bookmark bar.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Bookmark {
-    /// Text shown on the bookmark.
     pub title: String,
-    /// Where it goes. Must start with `http://` or `https://`.
     pub url: String,
 }
 
-/// The look and names of the contest machines.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Branding {
-    /// Contest name shown to the contestant, for example on the desktop.
     pub display_name: String,
-    /// Pattern for the computer name. Placeholders: `{team}`, `{site}` and `{n}`.
+    /// Placeholders: `{team}`, `{site}` and `{n}`.
     pub computer_name_pattern: String,
-    /// Label of the USB drive, at most 11 characters, FAT rules.
+    /// At most 11 characters, FAT rules.
     pub usb_label: String,
-    /// File name of the wallpaper, stored next to the settings.
+    /// File name only; the file sits next to `config.json`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub wallpaper: Option<String>,
-    /// Bookmarks in the browser.
     pub bookmarks: Vec<Bookmark>,
-    /// The browser's home page.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub home_page: Option<String>,
-    /// Text shown to the contestant at login.
     pub welcome_text: String,
 }
 
@@ -47,16 +39,12 @@ impl Default for Branding {
     }
 }
 
-/// The placeholders a computer-name pattern may contain.
 pub const COMPUTER_NAME_PLACEHOLDERS: [&str; 3] = ["{team}", "{site}", "{n}"];
 
-/// The longest computer name Linux allows.
 pub const MAX_COMPUTER_NAME_LENGTH: usize = 63;
 
-/// Builds a computer name from the pattern.
-///
-/// The values are made safe for a host name: lowercase ASCII letters and digits, with each run of
-/// anything else turned into one `-`, no `-` at the ends, and at most 63 characters.
+/// Fills the placeholders and makes the result a valid host name: lowercase letters and digits,
+/// each run of anything else becomes one `-`, no `-` at the ends, at most 63 characters.
 #[must_use]
 pub fn render_computer_name(pattern: &str, team: &str, site: &str, number: u32) -> String {
     let filled = pattern

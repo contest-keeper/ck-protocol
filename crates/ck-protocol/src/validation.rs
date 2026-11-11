@@ -5,79 +5,56 @@ use crate::branding::{Branding, COMPUTER_NAME_PLACEHOLDERS};
 use crate::network::is_valid_domain;
 use crate::settings::{SCHEMA, Settings, StickConfig};
 
-/// The longest USB label FAT allows.
 pub const MAX_USB_LABEL_LENGTH: usize = 11;
 
-/// Characters FAT does not allow in a volume label, besides control characters.
+// FAT forbids these in a volume label, besides control characters.
 const FORBIDDEN_LABEL_CHARACTERS: &str = "\"*+,./:;<=>?[\\]|";
 
-/// One thing wrong with the settings.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 #[non_exhaustive]
 pub enum Problem {
-    /// The contest ends at or before its start.
     #[error("the contest must end after it starts")]
     ContestEndsBeforeItStarts,
-    /// The computer-name pattern is empty.
     #[error("the computer name pattern is empty")]
     ComputerNameEmpty,
-    /// The pattern has a `{...}` that is not a placeholder.
     #[error(
         "the computer name pattern has an unknown placeholder '{0}' (use {{team}}, {{site}} or {{n}})"
     )]
     ComputerNameUnknownPlaceholder(String),
-    /// The pattern has a character a computer name cannot contain.
     #[error(
         "the computer name pattern may only have letters, digits and '-' besides placeholders (found '{0}')"
     )]
     ComputerNameBadCharacter(char),
-    /// The USB label is empty.
     #[error("the USB label is empty")]
     UsbLabelEmpty,
-    /// The USB label is longer than FAT allows.
     #[error("the USB label has {0} characters, at most {MAX_USB_LABEL_LENGTH} are allowed")]
     UsbLabelTooLong(usize),
-    /// The USB label has a character FAT does not allow.
     #[error("the USB label cannot contain '{0}'")]
     UsbLabelBadCharacter(char),
-    /// The wallpaper is not a plain file name.
     #[error("the wallpaper '{0}' must be a file name, not a path")]
     WallpaperNotAFileName(String),
-    /// A bookmark has no title.
     #[error("a bookmark for {0} has no title")]
     BookmarkWithoutTitle(String),
-    /// A bookmark address is not a web address.
     #[error(
         "the bookmark '{title}' needs an address starting with http:// or https:// (got '{url}')"
     )]
-    BookmarkUrlInvalid {
-        /// Title of the bookmark.
-        title: String,
-        /// The address that was rejected.
-        url: String,
-    },
-    /// The home page is not a web address.
+    BookmarkUrlInvalid { title: String, url: String },
     #[error("the home page needs an address starting with http:// or https:// (got '{0}')")]
     HomePageInvalid(String),
-    /// An allowed site is not a site name.
     #[error("'{0}' is not a valid site name")]
     SiteNameInvalid(String),
-    /// The snapshot interval is zero.
     #[error("the snapshot interval must be at least 1 second")]
     SnapshotIntervalZero,
-    /// The server address is not a web address.
     #[error("the server address must start with http:// or https:// (got '{0}')")]
     ApiUrlInvalid(String),
-    /// The heartbeat interval is zero.
     #[error("the heartbeat interval must be at least 1 second")]
     HeartbeatIntervalZero,
-    /// The file is in a format this version cannot read.
     #[error("the settings file has format version {0}, this program reads version {SCHEMA}")]
     UnsupportedSchema(u32),
 }
 
 impl Settings {
-    /// Every problem with the settings. An empty list means they can be used.
+    /// An empty list means the settings can be used.
     #[must_use]
     pub fn validate(&self) -> Vec<Problem> {
         let mut problems = Vec::new();
@@ -114,7 +91,6 @@ impl Settings {
 }
 
 impl StickConfig {
-    /// Every problem with the file: its format version and its settings.
     #[must_use]
     pub fn validate(&self) -> Vec<Problem> {
         let mut problems = Vec::new();

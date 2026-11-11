@@ -6,15 +6,11 @@ use std::str::FromStr;
 use chrono::NaiveDateTime;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-/// A local date and time without a time zone, such as `2026-11-15T09:00`.
-///
-/// Contest times are the clock on the wall of the venue, so they carry no zone. Accepted
-/// forms are `YYYY-MM-DDTHH:MM`, `YYYY-MM-DDTHH:MM:SS` and the same with a space instead of
-/// the `T`. It is written as `YYYY-MM-DDTHH:MM`, or with seconds when they are not zero.
+/// A date and time as shown on the venue's wall clock, so it has no time zone.
+/// Reads `YYYY-MM-DDTHH:MM[:SS]` (a space may replace the `T`); writes seconds only when they are not zero.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct LocalDateTime(NaiveDateTime);
 
-/// The text is not a date and time in one of the accepted forms.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 #[error("'{0}' is not a date and time like 2026-11-15T09:00")]
 pub struct ParseLocalDateTimeError(String);
@@ -27,7 +23,6 @@ impl LocalDateTime {
         "%Y-%m-%d %H:%M:%S",
     ];
 
-    /// The date and time as a chrono value, for comparisons and calculations.
     #[must_use]
     pub fn as_naive(self) -> NaiveDateTime {
         self.0

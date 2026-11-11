@@ -4,38 +4,26 @@ use serde::{Deserialize, Serialize};
 
 use crate::time::LocalDateTime;
 
-/// The judge platform that runs the contest.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Platform {
-    /// kilonova.ro and its contest instances.
     #[default]
     Kilonova,
-    /// codeforces.com.
     Codeforces,
-    /// vjudge.net.
     Vjudge,
-    /// Any other platform. The stick reports presence only.
     Other,
 }
 
-/// The contest an admin sets up.
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Contest {
-    /// Name shown to organizers, such as `RCPC 2026`.
     pub name: String,
-    /// The judge platform.
     pub platform: Platform,
-    /// The contest's id on the platform. Empty until the admin fills it in.
     pub contest_id: String,
-    /// When the contest starts, by the venue's clock.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub start: Option<LocalDateTime>,
-    /// When the contest ends, by the venue's clock.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub end: Option<LocalDateTime>,
-    /// A practice session: alerts are shown but the contest is not scored as official.
     pub practice: bool,
 }
 
