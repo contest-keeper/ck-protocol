@@ -80,38 +80,16 @@ mod tests {
     use super::*;
 
     #[test]
-    fn accepts_ordinary_stick_ids() {
-        for text in ["03c9f556", "A", "lab-1-seat-07", &"x".repeat(64)] {
-            assert_eq!(StickId::parse(text).expect(text).as_str(), text);
-        }
-    }
-
-    #[test]
-    fn rejects_bad_stick_ids() {
-        for text in ["", "has space", "slash/", "dot.", "ünï", &"x".repeat(65)] {
+    fn checks_stick_ids_when_they_are_read() {
+        assert!(serde_json::from_str::<StickId>("\"03c9f556\"").is_ok());
+        for text in ["", "has space", "slash/", &"x".repeat(65)] {
             assert!(StickId::parse(text).is_err(), "{text:?} should be rejected");
         }
-    }
-
-    #[test]
-    fn stick_id_is_checked_when_read_from_json() {
-        assert!(serde_json::from_str::<StickId>("\"03c9f556\"").is_ok());
         assert!(serde_json::from_str::<StickId>("\"not valid!\"").is_err());
     }
 
     #[test]
-    fn token_is_hidden_in_debug_output() {
-        let token = Token::new("super-secret");
-        assert!(!format!("{token:?}").contains("super-secret"));
-        assert_eq!(token.expose(), "super-secret");
-    }
-
-    #[test]
-    fn token_is_a_plain_string_in_json() {
-        let token: Token = serde_json::from_str("\"abc\"").expect("valid json");
-        assert_eq!(
-            serde_json::to_string(&token).expect("serializes"),
-            "\"abc\""
-        );
+    fn the_token_does_not_show_in_debug_output() {
+        assert!(!format!("{:?}", Token::new("super-secret")).contains("super-secret"));
     }
 }

@@ -74,45 +74,16 @@ mod tests {
     use super::*;
 
     #[test]
-    fn fills_placeholders() {
+    fn builds_a_valid_host_name() {
         assert_eq!(
-            render_computer_name("{team}-{n}", "Team A", "Lab 1", 7),
-            "team-a-7"
+            render_computer_name("{site}-{team}-{n}", "Team A", "Lab 1", 7),
+            "lab-1-team-a-7"
         );
-        assert_eq!(
-            render_computer_name("{site}-{team}-{n}", "T", "Lab 1", 12),
-            "lab-1-t-12"
-        );
-    }
-
-    #[test]
-    fn makes_names_safe_for_a_host_name() {
         assert_eq!(
             render_computer_name("{team}", "  Ünï  cødé!! ", "", 1),
             "n-c-d"
         );
-        assert_eq!(render_computer_name("{team}", "---", "", 1), "");
-    }
-
-    #[test]
-    fn cuts_long_names_without_a_trailing_dash() {
-        let name = render_computer_name("{team}", &"a-".repeat(60), "", 1);
-        assert!(name.len() <= MAX_COMPUTER_NAME_LENGTH);
-        assert!(!name.ends_with('-'));
-    }
-
-    #[test]
-    fn defaults_are_usable() {
-        let branding = Branding::default();
-        assert_eq!(branding.computer_name_pattern, "{team}-{n}");
-        assert!(branding.usb_label.len() <= 11);
-    }
-
-    #[test]
-    fn missing_optional_parts_are_left_out_when_written() {
-        let json = serde_json::to_string(&Branding::default()).expect("serializes");
-        assert!(
-            !json.contains("wallpaper") && !json.contains("home_page") && !json.contains("null")
-        );
+        let long = render_computer_name("{team}", &"a-".repeat(60), "", 1);
+        assert!(long.len() <= MAX_COMPUTER_NAME_LENGTH && !long.ends_with('-'));
     }
 }

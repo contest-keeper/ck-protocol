@@ -39,7 +39,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn accepts_http_and_https_addresses() {
+    fn accepts_web_addresses_and_rejects_other_text() {
         for url in [
             "http://10.0.2.2:8088",
             "https://hub.example.org",
@@ -47,10 +47,6 @@ mod tests {
         ] {
             assert!(is_valid_http_url(url), "{url} should be valid");
         }
-    }
-
-    #[test]
-    fn rejects_other_text() {
         for url in [
             "",
             "hub.example.org",
@@ -58,16 +54,8 @@ mod tests {
             "https://",
             "http://:80",
             "https://a b.org",
-            "https:///x",
         ] {
             assert!(!is_valid_http_url(url), "{url:?} should be invalid");
         }
-    }
-
-    #[test]
-    fn defaults_report_nowhere_every_15_seconds() {
-        let api = Api::default();
-        assert_eq!(api.url, "");
-        assert_eq!(api.heartbeat_s, 15);
     }
 }

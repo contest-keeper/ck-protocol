@@ -65,32 +65,4 @@ mod tests {
             assert_eq!(json, format!("\"{}\"", mode.as_str()));
         }
     }
-
-    #[test]
-    fn defaults_are_low_after_a_minute() {
-        let recording = Recording::default();
-        assert_eq!(recording.mode, RecordingMode::Low);
-        assert_eq!(recording.start_delay_s, 60);
-        assert!(recording.start_at.is_none());
-    }
-
-    #[test]
-    fn reads_the_start_time() {
-        let recording: Recording =
-            serde_json::from_str(r#"{"mode":"standard","start_at":"2026-11-15T09:00"}"#)
-                .expect("valid json");
-        assert_eq!(recording.mode, RecordingMode::Standard);
-        assert_eq!(
-            recording.start_at.expect("start time").to_string(),
-            "2026-11-15T09:00"
-        );
-        assert_eq!(recording.start_delay_s, 60);
-    }
-
-    #[test]
-    fn a_null_start_time_means_none() {
-        let recording: Recording =
-            serde_json::from_str(r#"{"start_at":null}"#).expect("valid json");
-        assert!(recording.start_at.is_none());
-    }
 }

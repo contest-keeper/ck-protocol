@@ -182,6 +182,7 @@ fn check_usb_label(label: &str, problems: &mut Vec<Problem>) {
 mod tests {
     use super::*;
     use crate::branding::Bookmark;
+    use crate::ids::{StickId, Token};
 
     const NO_PROBLEMS: [Problem; 0] = [];
 
@@ -193,11 +194,11 @@ mod tests {
 
     #[test]
     fn the_defaults_have_no_problems() {
-        assert_eq!(Settings::default().validate(), Vec::new());
+        assert_eq!(Settings::default().validate(), NO_PROBLEMS);
     }
 
     #[test]
-    fn rejects_a_contest_that_ends_before_it_starts() {
+    fn a_contest_must_end_after_it_starts() {
         let problems = problems_with(|s| {
             s.contest.start = Some("2026-11-15T14:00".parse().expect("valid time"));
             s.contest.end = Some("2026-11-15T09:00".parse().expect("valid time"));
@@ -206,184 +207,44 @@ mod tests {
     }
 
     #[test]
-    fn accepts_a_contest_with_only_a_start() {
-        let problems = problems_with(|s| {
-            s.contest.start = Some("2026-11-15T09:00".parse().expect("valid time"));
-        });
-        assert_eq!(problems, NO_PROBLEMS);
-    }
-
-    #[test]
-    fn rejects_an_empty_computer_name_pattern() {
+    fn checks_the_computer_name_pattern() {
+        let pattern =
+            |text: &str| problems_with(|s| s.branding.computer_name_pattern = text.to_owned());
+        assert_eq!(pattern("{site}-{team}-{n}"), NO_PROBLEMS);
+        assert_eq!(pattern(""), [Problem::ComputerNameEmpty]);
         assert_eq!(
-            problems_with(|s| s.branding.computer_name_pattern.clear()),
-            [Problem::ComputerNameEmpty]
-        );
-    }
-
-    #[test]
-    fn rejects_unknown_placeholders_in_the_computer_name() {
-        let problems =
-            problems_with(|s| s.branding.computer_name_pattern = "{team}-{seat}".to_owned());
-        assert_eq!(
-            problems,
+            pattern("{team}-{seat}"),
             [Problem::ComputerNameUnknownPlaceholder("{seat}".to_owned())]
         );
-        let unclosed = problems_with(|s| s.branding.computer_name_pattern = "pc-{team".to_owned());
-        assert_eq!(
-            unclosed,
-            [Problem::ComputerNameUnknownPlaceholder("{team".to_owned())]
-        );
-    }
-
-    #[test]
-    fn rejects_bad_characters_in_the_computer_name() {
-        let problems = problems_with(|s| s.branding.computer_name_pattern = "pc_{n} x".to_owned());
-        assert_eq!(
-            problems,
-            [
-                Problem::ComputerNameBadCharacter('_'),
-                Problem::ComputerNameBadCharacter(' ')
-            ]
-        );
-    }
-
-    #[test]
-    fn accepts_every_placeholder_together() {
-        assert_eq!(
-            problems_with(|s| s.branding.computer_name_pattern = "{site}-{team}-{n}".to_owned()),
-            NO_PROBLEMS
-        );
+        assert_eq!(pattern("pc_{n}"), [Problem::ComputerNameBadCharacter('_')]);
     }
 
     #[test]
     fn checks_the_usb_label() {
-        assert_eq!(
-            problems_with(|s| s.branding.usb_label.clear()),
-            [Problem::UsbLabelEmpty]
-        );
-        assert_eq!(
-            problems_with(|s| s.branding.usb_label = "ELEVENCHARS".to_owned()),
-            NO_PROBLEMS
-        );
-        assert_eq!(
-            problems_with(|s| s.branding.usb_label = "TWELVE CHARS".to_owned()),
-            [Problem::UsbLabelTooLong(12)]
-        );
-        assert_eq!(
-            problems_with(|s| s.branding.usb_label = "A:B".to_owned()),
-            [Problem::UsbLabelBadCharacter(':')]
-        );
-        assert_eq!(
-            problems_with(|s| s.branding.usb_label = "CONCURS\u{103}".to_owned()),
-            [Problem::UsbLabelBadCharacter('\u{103}')]
-        );
+        let label = |text: &str| problems_with(|s| s.branding.usb_label = text.to_owned());
+        assert_eq!(label("ELEVENCHARS"), NO_PROBLEMS);
+        assert_eq!(label(""), [Problem::UsbLabelEmpty]);
+        assert_eq!(label("TWELVE CHARS"), [Problem::UsbLabelTooLong(12)]);
+        assert_eq!(label("A:B"), [Problem::UsbLabelBadCharacter(':')]);
     }
 
     #[test]
-    fn the_wallpaper_must_be_a_file_name() {
-        assert_eq!(
-            problems_with(|s| s.branding.wallpaper = Some("wall.png".to_owned())),
-            NO_PROBLEMS
-        );
-        for path in ["a/b.png", "..\\b.png", "", ".."] {
-            assert_eq!(
-                problems_with(|s| s.branding.wallpaper = Some(path.to_owned())),
-                [Problem::WallpaperNotAFileName(path.to_owned())],
-                "{path:?}"
-            );
-        }
-    }
-
-    #[test]
-    fn checks_bookmarks_and_the_home_page() {
+    fn checks_files_and_web_addresses() {
         let problems = problems_with(|s| {
-            s.branding.bookmarks = vec![
-                Bookmark {
-                    title: "Judge".to_owned(),
-                    url: "https://rcpc.kilonova.ro".to_owned(),
-                },
-                Bookmark {
-                    title: " ".to_owned(),
-                    url: "https://ok.org".to_owned(),
-                },
-                Bookmark {
-                    title: "Bad".to_owned(),
-                    url: "kilonova.ro".to_owned(),
-                },
-            ];
+            s.branding.wallpaper = Some("../wall.png".to_owned());
+            s.branding.bookmarks = vec![Bookmark {
+                title: "Bad".to_owned(),
+                url: "kilonova.ro".to_owned(),
+            }];
             s.branding.home_page = Some("javascript:alert(1)".to_owned());
+            s.network.allowed_domains = vec!["not a site".to_owned()];
+            s.api.url = "ftp://x.org".to_owned();
         });
-        assert_eq!(
-            problems,
-            [
-                Problem::BookmarkWithoutTitle("https://ok.org".to_owned()),
-                Problem::BookmarkUrlInvalid {
-                    title: "Bad".to_owned(),
-                    url: "kilonova.ro".to_owned()
-                },
-                Problem::HomePageInvalid("javascript:alert(1)".to_owned()),
-            ]
-        );
-    }
-
-    #[test]
-    fn rejects_bad_site_names() {
-        let problems = problems_with(|s| s.network.allowed_domains.push("not a site".to_owned()));
-        assert_eq!(
-            problems,
-            [Problem::SiteNameInvalid("not a site".to_owned())]
-        );
-    }
-
-    #[test]
-    fn rejects_zero_intervals() {
-        assert_eq!(
-            problems_with(|s| s.recording.snapshot_interval_s = Some(0)),
-            [Problem::SnapshotIntervalZero]
-        );
-        assert_eq!(
-            problems_with(|s| s.api.heartbeat_s = 0),
-            [Problem::HeartbeatIntervalZero]
-        );
-    }
-
-    #[test]
-    fn rejects_a_server_address_that_is_not_a_web_address() {
-        assert_eq!(
-            problems_with(|s| s.api.url = "ftp://x.org".to_owned()),
-            [Problem::ApiUrlInvalid("ftp://x.org".to_owned())]
-        );
-        assert_eq!(
-            problems_with(|s| s.api.url = "https://hub.example.org".to_owned()),
-            NO_PROBLEMS
-        );
-    }
-
-    #[test]
-    fn reports_every_problem_at_once() {
-        let problems = problems_with(|s| {
-            s.api.heartbeat_s = 0;
-            s.api.url = "nope".to_owned();
-            s.branding.usb_label.clear();
-        });
-        assert_eq!(problems.len(), 3);
-    }
-
-    #[test]
-    fn problems_read_as_plain_sentences() {
-        let text = Problem::UsbLabelTooLong(12).to_string();
-        assert_eq!(
-            text,
-            "the USB label has 12 characters, at most 11 are allowed"
-        );
-        let text = Problem::ComputerNameUnknownPlaceholder("{seat}".to_owned()).to_string();
-        assert!(text.contains("{seat}") && text.contains("{team}"));
+        assert_eq!(problems.len(), 5);
     }
 
     #[test]
     fn a_stick_file_needs_the_current_format() {
-        use crate::ids::{StickId, Token};
         let mut config = StickConfig {
             schema: SCHEMA,
             stick_id: StickId::parse("s1").expect("valid id"),

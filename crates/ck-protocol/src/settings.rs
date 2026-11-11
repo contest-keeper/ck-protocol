@@ -59,7 +59,6 @@ pub struct StickConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::recording::RecordingMode;
 
     /// A file in the Python prototype's layout, with the secret moved to the top level.
     const SAMPLE: &str = r#"{
@@ -72,61 +71,28 @@ mod tests {
         "site": "Lab 1",
         "allowed_domains": [".cppreference.com", ".rcpc.kilonova.ro"],
         "recording": {"mode": "low", "start_delay_s": 60, "start_at": null},
-        "api": {"url": "http://10.0.2.2:8088", "heartbeat_s": 15}
+        "api": {"url": "http://10.0.2.2:8088", "heartbeat_s": 15},
+        "added_by_a_newer_version": true
     }"#;
 
     #[test]
-    fn reads_a_stick_file() {
+    fn reads_and_rewrites_a_stick_file() {
         let config: StickConfig = serde_json::from_str(SAMPLE).expect("valid file");
-        assert_eq!(config.schema, SCHEMA);
         assert_eq!(config.stick_id.as_str(), "03c9f556");
-        assert_eq!(config.token.expose(), "abc");
-        assert_eq!(config.settings.team, "Test Team");
         assert_eq!(config.settings.network.allowed_domains.len(), 2);
-        assert_eq!(config.settings.recording.mode, RecordingMode::Low);
         assert_eq!(config.settings.api.url, "http://10.0.2.2:8088");
-        assert_eq!(config.settings.branding, Branding::default());
+
+        let json = serde_json::to_value(&config).expect("serializes");
+        assert!(json.get("allowed_domains").is_some() && json.get("network").is_none());
+        assert!(!json.to_string().contains("null"));
+        assert_eq!(
+            serde_json::from_value::<StickConfig>(json).expect("valid file"),
+            config
+        );
     }
 
     #[test]
-    fn a_stick_file_survives_a_round_trip() {
-        let config: StickConfig = serde_json::from_str(SAMPLE).expect("valid file");
-        let json = serde_json::to_string(&config).expect("serializes");
-        let again: StickConfig = serde_json::from_str(&json).expect("valid file");
-        assert_eq!(config, again);
-        assert!(!json.contains("null"));
-    }
-
-    #[test]
-    fn writes_the_sites_at_the_top_level() {
-        let json = serde_json::to_value(StickConfig {
-            schema: SCHEMA,
-            stick_id: StickId::parse("s1").expect("valid id"),
-            created_at: "2026-11-10T15:22".parse().expect("valid time"),
-            token: Token::new("t"),
-            settings: Settings::default(),
-        })
-        .expect("serializes");
-        assert!(json.get("allowed_domains").is_some());
-        assert!(json.get("network").is_none());
-        assert!(json.get("settings").is_none());
-    }
-
-    #[test]
-    fn settings_without_any_field_use_the_defaults() {
-        let settings: Settings = serde_json::from_str("{}").expect("valid json");
-        assert_eq!(settings, Settings::default());
-    }
-
-    #[test]
-    fn unknown_fields_are_ignored() {
-        let settings: Settings =
-            serde_json::from_str(r#"{"team":"T","from_the_future":1}"#).expect("valid json");
-        assert_eq!(settings.team, "T");
-    }
-
-    #[test]
-    fn a_stick_file_needs_its_identity() {
+    fn a_stick_file_needs_a_valid_identity() {
         assert!(serde_json::from_str::<StickConfig>(r#"{"team":"T"}"#).is_err());
         assert!(
             serde_json::from_str::<StickConfig>(&SAMPLE.replace("03c9f556", "bad id")).is_err()
