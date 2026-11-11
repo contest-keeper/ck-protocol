@@ -2,27 +2,11 @@
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Network {
     /// `example.org`, or `.example.org` to include subdomains.
     pub allowed_domains: Vec<String>,
-}
-
-impl Default for Network {
-    /// The documentation sites and the judge of the first contest this was built for.
-    fn default() -> Self {
-        let sites = [
-            ".cppreference.com",
-            ".docs.python.org",
-            ".docs.oracle.com",
-            ".kotlinlang.org",
-            ".rcpc.kilonova.ro",
-        ];
-        Self {
-            allowed_domains: sites.iter().map(|site| (*site).to_owned()).collect(),
-        }
-    }
 }
 
 /// At least two parts of ASCII letters, digits and `-`, with an optional leading dot.
@@ -69,14 +53,7 @@ mod tests {
     }
 
     #[test]
-    fn default_sites_are_all_valid() {
-        let network = Network::default();
-        assert_ne!(network.allowed_domains, Vec::<String>::new());
-        assert!(
-            network
-                .allowed_domains
-                .iter()
-                .all(|site| is_valid_domain(site))
-        );
+    fn no_site_is_allowed_until_the_admin_chooses() {
+        assert_eq!(Network::default().allowed_domains, Vec::<String>::new());
     }
 }
