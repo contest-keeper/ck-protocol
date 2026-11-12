@@ -3,7 +3,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::api::Api;
-use crate::branding::Branding;
+use crate::branding::{Branding, render_computer_name};
 use crate::contest::Contest;
 use crate::ids::{StickId, Token};
 use crate::network::Network;
@@ -52,8 +52,25 @@ pub struct StickConfig {
     pub created_at: LocalDateTime,
     /// Held only by the admin tool's registry and the stick itself.
     pub token: Token,
+    /// Which machine of the contest this is, for `{n}` in the computer name. The admin tool counts
+    /// them. Sticks made before numbering existed have none and count as 1.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub machine_number: Option<u32>,
     #[serde(flatten)]
     pub settings: Settings,
+}
+
+impl StickConfig {
+    /// The name the machine gets, from the branding pattern, the team, the site and the number.
+    #[must_use]
+    pub fn computer_name(&self) -> String {
+        render_computer_name(
+            &self.settings.branding.computer_name_pattern,
+            &self.settings.team,
+            &self.settings.site,
+            self.machine_number.unwrap_or(1),
+        )
+    }
 }
 
 #[cfg(test)]
@@ -87,6 +104,26 @@ mod tests {
         assert!(!json.to_string().contains("null"));
         assert_eq!(
             serde_json::from_value::<StickConfig>(json).expect("valid file"),
+            config
+        );
+    }
+
+    #[test]
+    fn the_machine_number_is_optional_and_names_the_computer() {
+        let mut config: StickConfig = serde_json::from_str(SAMPLE).expect("valid file");
+        assert_eq!(config.machine_number, None, "an older file has no number");
+        assert!(
+            !serde_json::to_string(&config)
+                .expect("json")
+                .contains("machine_number")
+        );
+        assert_eq!(config.computer_name(), "test-team-1");
+
+        config.machine_number = Some(7);
+        assert_eq!(config.computer_name(), "test-team-7");
+        let json = serde_json::to_string(&config).expect("json");
+        assert_eq!(
+            serde_json::from_str::<StickConfig>(&json).expect("valid file"),
             config
         );
     }

@@ -58,6 +58,10 @@ pub enum Problem {
     IdentityTextInvalid(&'static str),
     #[error("the settings file has format version {0}, this program reads version {SCHEMA}")]
     UnsupportedSchema(u32),
+    #[error("the machine number must be 1 or more")]
+    MachineNumberZero,
+    #[error("the computer name would be empty, so the pattern and the team need letters or digits")]
+    ComputerNameUnusable,
 }
 
 impl Settings {
@@ -110,7 +114,14 @@ impl StickConfig {
         if self.schema != SCHEMA {
             problems.push(Problem::UnsupportedSchema(self.schema));
         }
+        if self.machine_number == Some(0) {
+            problems.push(Problem::MachineNumberZero);
+        }
         problems.extend(self.settings.validate());
+        // The pattern may be fine on its own and still give nothing for this team and site.
+        if self.computer_name().is_empty() {
+            problems.push(Problem::ComputerNameUnusable);
+        }
         problems
     }
 }
@@ -282,10 +293,22 @@ mod tests {
             stick_id: StickId::parse("s1").expect("valid id"),
             created_at: "2026-11-10T15:22".parse().expect("valid time"),
             token: Token::new("t"),
+            machine_number: None,
             settings: Settings::default(),
         };
         assert_eq!(config.validate(), NO_PROBLEMS);
         config.schema = 2;
         assert_eq!(config.validate(), [Problem::UnsupportedSchema(2)]);
+        config.schema = SCHEMA;
+
+        config.machine_number = Some(0);
+        assert_eq!(config.validate(), [Problem::MachineNumberZero]);
+        config.machine_number = Some(3);
+        assert_eq!(config.validate(), NO_PROBLEMS);
+
+        // Nothing usable is left of the name once the characters a host name cannot have are gone.
+        config.settings.branding.computer_name_pattern = "{team}".to_owned();
+        config.settings.team = "!!!".to_owned();
+        assert_eq!(config.validate(), [Problem::ComputerNameUnusable]);
     }
 }
