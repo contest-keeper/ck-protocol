@@ -17,6 +17,10 @@ const ROOT_FIRST: u64 = EFI_LAST + 1;
 const ROOT_LAST: u64 = IMAGE_SIZE / SECTOR_SIZE - 34;
 const BEFORE_EFI_BYTES: usize = 2048 * 512;
 const HEADER_ENTRY_COUNT_AT: usize = 512 + 80;
+const HEADER_ENTRY_SIZE_AT: usize = 512 + 84;
+const HEADER_CRC_AT: usize = 512 + 16;
+const FIRST_ENTRY_LAST_SECTOR_AT: usize = 2 * 512 + 40;
+const HEADER_ENTRIES_CRC_AT: usize = 512 + 88;
 
 /// Builds a small image: a GPT with an EFI partition (FAT32, label EFI) and a Linux partition filled with a
 /// recognisable pattern, so a test can tell whether anything outside the EFI partition changed.
@@ -133,6 +137,61 @@ fn explains_a_file_that_is_not_an_image() {
     assert!(matches!(error, Error::BadPartitionTable(_)));
 }
 
+/// Fixes the checksums of an image whose header or entries were changed, like a crafted image would.
+fn reseal(image: &mut [u8]) {
+    let entries_crc = crc32fast::hash(&image[1024..1024 + 128 * 128]);
+    image[HEADER_ENTRIES_CRC_AT..HEADER_ENTRIES_CRC_AT + 4]
+        .copy_from_slice(&entries_crc.to_le_bytes());
+    image[HEADER_CRC_AT..HEADER_CRC_AT + 4].fill(0);
+    let crc = crc32fast::hash(&image[512..512 + 92]);
+    image[HEADER_CRC_AT..HEADER_CRC_AT + 4].copy_from_slice(&crc.to_le_bytes());
+}
+
+#[test]
+fn rejects_a_crafted_partition_table_without_crashing() {
+    let dir = TempDir::new().expect("temp dir");
+    let original = fs::read(make_image(&dir)).expect("read image");
+    let read = |bytes: Vec<u8>| read_partitions(&mut std::io::Cursor::new(bytes));
+
+    // A huge entry size would ask for terabytes of memory.
+    let mut huge = original.clone();
+    huge[HEADER_ENTRY_SIZE_AT..HEADER_ENTRY_SIZE_AT + 4]
+        .copy_from_slice(&0xFFFF_0000_u32.to_le_bytes());
+    reseal(&mut huge);
+    assert!(matches!(read(huge), Err(Error::BadPartitionTable(_))));
+
+    // A partition end that overflows when turned into bytes.
+    let mut overflow = original.clone();
+    overflow[FIRST_ENTRY_LAST_SECTOR_AT..FIRST_ENTRY_LAST_SECTOR_AT + 8]
+        .copy_from_slice(&u64::MAX.to_le_bytes());
+    reseal(&mut overflow);
+    assert!(matches!(read(overflow), Err(Error::BadPartitionTable(_))));
+
+    // A partition that ends before it starts.
+    let mut backwards = original;
+    backwards[FIRST_ENTRY_LAST_SECTOR_AT..FIRST_ENTRY_LAST_SECTOR_AT + 8]
+        .copy_from_slice(&1_u64.to_le_bytes());
+    reseal(&mut backwards);
+    assert!(matches!(read(backwards), Err(Error::BadPartitionTable(_))));
+}
+
+#[test]
+fn refuses_a_partition_that_goes_past_the_end_of_the_file() {
+    let dir = TempDir::new().expect("temp dir");
+    let image = make_image(&dir);
+    let mut bytes = fs::read(&image).expect("read image");
+    let past_the_end = IMAGE_SIZE / SECTOR_SIZE + 1000;
+    bytes[FIRST_ENTRY_LAST_SECTOR_AT..FIRST_ENTRY_LAST_SECTOR_AT + 8]
+        .copy_from_slice(&past_the_end.to_le_bytes());
+    reseal(&mut bytes);
+    fs::write(&image, bytes).expect("write image");
+
+    assert!(matches!(
+        read_file(&image, "ck/config.json"),
+        Err(Error::BadPartitionTable(_))
+    ));
+}
+
 #[test]
 fn writes_and_reads_settings_without_touching_the_rest_of_the_image() {
     let dir = TempDir::new().expect("temp dir");
@@ -195,6 +254,23 @@ fn copies_an_image_without_touching_the_source_or_an_existing_file() {
         copy_image(&image, &image, |_, _| {}),
         Err(Error::DestinationExists(_))
     ));
+}
+
+#[cfg(unix)]
+#[test]
+fn a_failed_copy_leaves_no_partial_file_so_a_retry_works() {
+    let dir = TempDir::new().expect("temp dir");
+    let image = make_image(&dir);
+    let copy = dir.path().join("copy.img");
+
+    // Opening a folder works on Linux but reading it fails, so the copy fails after the destination
+    // was created.
+    assert!(matches!(
+        copy_image(dir.path(), &copy, |_, _| {}),
+        Err(Error::Io { .. })
+    ));
+    assert!(!copy.exists());
+    copy_image(&image, &copy, |_, _| {}).expect("retry works");
 }
 
 /// Run by hand against a COPY of the real image: `CK_TEST_IMAGE=C:\rcpc\copy.img cargo test -p ck-image -- --ignored`.

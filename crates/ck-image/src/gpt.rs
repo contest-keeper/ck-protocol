@@ -10,6 +10,9 @@ const SECTOR_BYTES: usize = 512;
 const SIGNATURE: &[u8; 8] = b"EFI PART";
 const MIN_HEADER_SIZE: usize = 92;
 const MAX_ENTRIES: u32 = 1024;
+const MIN_ENTRY_SIZE: u32 = 128;
+/// The standard size is 128; the format allows larger powers of two, but nothing real needs more.
+const MAX_ENTRY_SIZE: u32 = 4096;
 
 /// A partition type id, kept as stored on disk (the first three fields are little-endian).
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -118,32 +121,61 @@ pub fn read_partitions<R: Read + Seek>(disk: &mut R) -> Result<Vec<Partition>, E
 
     let entries_lba = le_u64(&header, 72);
     let count = le_u32(&header, 80);
-    let entry_size = le_u32(&header, 84) as usize;
-    if count > MAX_ENTRIES || entry_size < 128 {
+    let entry_size = le_u32(&header, 84);
+    if count > MAX_ENTRIES || !(MIN_ENTRY_SIZE..=MAX_ENTRY_SIZE).contains(&entry_size) {
         return Err(Error::BadPartitionTable(
             "the partition entries have an unexpected size",
         ));
     }
+    let entry_size = entry_size as usize;
+    let entries_offset = entries_lba
+        .checked_mul(SECTOR_SIZE)
+        .ok_or(Error::BadPartitionTable(
+            "the partition list is placed outside the disk",
+        ))?;
     let mut entries = vec![0_u8; count as usize * entry_size];
-    read_at(disk, entries_lba * SECTOR_SIZE, &mut entries)?;
+    read_at(disk, entries_offset, &mut entries)?;
     if crc32fast::hash(&entries) != le_u32(&header, 88) {
         return Err(Error::BadPartitionTable(
             "the partition list checksum does not match",
         ));
     }
 
-    Ok(entries
-        .chunks_exact(entry_size)
-        .filter_map(|entry| {
-            let type_guid = Guid::from_disk_bytes(entry[..16].try_into().ok()?);
-            (!type_guid.is_zero()).then(|| Partition {
-                type_guid,
-                first_sector: le_u64(entry, 32),
-                last_sector: le_u64(entry, 40),
-                name: utf16_name(&entry[56..128]),
-            })
-        })
-        .collect())
+    let mut partitions = Vec::new();
+    for entry in entries.chunks_exact(entry_size) {
+        if let Some(partition) = parse_entry(entry)? {
+            partitions.push(partition);
+        }
+    }
+    Ok(partitions)
+}
+
+/// `None` for an unused slot.
+fn parse_entry(entry: &[u8]) -> Result<Option<Partition>, Error> {
+    let mut guid = [0_u8; 16];
+    guid.copy_from_slice(&entry[..16]);
+    let type_guid = Guid::from_disk_bytes(guid);
+    if type_guid.is_zero() {
+        return Ok(None);
+    }
+
+    let first_sector = le_u64(entry, 32);
+    let last_sector = le_u64(entry, 40);
+    // Checked here so that `start_byte` and `end_byte` can never overflow.
+    let end_byte = last_sector
+        .checked_add(1)
+        .and_then(|end| end.checked_mul(SECTOR_SIZE));
+    if first_sector > last_sector || end_byte.is_none() {
+        return Err(Error::BadPartitionTable(
+            "a partition has impossible start and end sectors",
+        ));
+    }
+    Ok(Some(Partition {
+        type_guid,
+        first_sector,
+        last_sector,
+        name: utf16_name(&entry[56..128]),
+    }))
 }
 
 /// The EFI system partition, where the settings go.

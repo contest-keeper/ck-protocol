@@ -36,13 +36,11 @@ pub fn read_file(image: &Path, path: &str) -> Result<Vec<u8>, Error> {
     let volume = open_efi(image, false)?;
     let mut folder = volume.root_dir();
     for part in folders {
-        folder = folder
-            .open_dir(part)
-            .map_err(|_| Error::FileNotFound(path.to_owned()))?;
+        folder = folder.open_dir(part).map_err(|e| missing_or_fat(e, path))?;
     }
     let mut file = folder
         .open_file(name)
-        .map_err(|_| Error::FileNotFound(path.to_owned()))?;
+        .map_err(|e| missing_or_fat(e, path))?;
     let mut content = Vec::new();
     file.read_to_end(&mut content)
         .map_err(|source| Error::io(format!("reading {path}"), source))?;
@@ -57,6 +55,15 @@ fn open_efi(image: &Path, writable: bool) -> Result<EfiVolume, Error> {
         .map_err(|source| Error::io(format!("opening {}", image.display()), source))?;
     let partitions = read_partitions(&mut file)?;
     let efi = find_efi(&partitions)?;
+    let file_length = file
+        .metadata()
+        .map_err(|source| Error::io("reading the image size", source))?
+        .len();
+    if efi.end_byte() > file_length {
+        return Err(Error::BadPartitionTable(
+            "the EFI partition extends past the end of the file",
+        ));
+    }
     let slice = StreamSlice::new(file, efi.start_byte(), efi.end_byte())
         .map_err(|source| Error::io("selecting the EFI partition", source))?;
     FileSystem::new(BufStream::new(slice), FsOptions::new()).map_err(fat)
@@ -70,6 +77,15 @@ fn split_path(path: &str) -> Result<(Vec<&str>, &str), Error> {
     match parts.pop() {
         Some(name) if valid => Ok((parts, name)),
         _ => Err(Error::BadPath(path.to_owned())),
+    }
+}
+
+/// Only a real "not found" means the file is missing; anything else is a damaged volume.
+fn missing_or_fat(error: std::io::Error, path: &str) -> Error {
+    if error.kind() == std::io::ErrorKind::NotFound {
+        Error::FileNotFound(path.to_owned())
+    } else {
+        fat(error)
     }
 }
 

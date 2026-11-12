@@ -7,6 +7,9 @@ use crate::settings::{SCHEMA, Settings, StickConfig};
 
 pub const MAX_USB_LABEL_LENGTH: usize = 11;
 
+/// Longest team or site name. Both end up in one-line files and in heartbeats.
+pub const MAX_IDENTITY_LENGTH: usize = 64;
+
 // FAT forbids these in a volume label, besides control characters.
 const FORBIDDEN_LABEL_CHARACTERS: &str = "\"*+,./:;<=>?[\\]|";
 
@@ -49,6 +52,10 @@ pub enum Problem {
     ApiUrlInvalid(String),
     #[error("the heartbeat interval must be at least 1 second")]
     HeartbeatIntervalZero,
+    #[error(
+        "the {0} must be 1 to {MAX_IDENTITY_LENGTH} characters, without line breaks or other control characters"
+    )]
+    IdentityTextInvalid(&'static str),
     #[error("the settings file has format version {0}, this program reads version {SCHEMA}")]
     UnsupportedSchema(u32),
 }
@@ -63,6 +70,12 @@ impl Settings {
             && end <= start
         {
             problems.push(Problem::ContestEndsBeforeItStarts);
+        }
+
+        for (field, text) in [("team", &self.team), ("site", &self.site)] {
+            if !is_valid_identity_text(text) {
+                problems.push(Problem::IdentityTextInvalid(field));
+            }
         }
 
         check_branding(&self.branding, &mut problems);
@@ -100,6 +113,11 @@ impl StickConfig {
         problems.extend(self.settings.validate());
         problems
     }
+}
+
+fn is_valid_identity_text(text: &str) -> bool {
+    let length = text.trim().chars().count();
+    (1..=MAX_IDENTITY_LENGTH).contains(&length) && !text.chars().any(char::is_control)
 }
 
 fn check_branding(branding: &Branding, problems: &mut Vec<Problem>) {
@@ -195,6 +213,20 @@ mod tests {
     #[test]
     fn the_defaults_have_no_problems() {
         assert_eq!(Settings::default().validate(), NO_PROBLEMS);
+    }
+
+    #[test]
+    fn team_and_site_are_short_single_line_text() {
+        let team = |text: &str| problems_with(|s| s.team = text.to_owned());
+        assert_eq!(team("Team A"), NO_PROBLEMS);
+        assert_eq!(team("   "), [Problem::IdentityTextInvalid("team")]);
+        assert_eq!(team("a\nb"), [Problem::IdentityTextInvalid("team")]);
+        assert_eq!(
+            team(&"x".repeat(65)),
+            [Problem::IdentityTextInvalid("team")]
+        );
+        let site = |text: &str| problems_with(|s| s.site = text.to_owned());
+        assert_eq!(site("Lab\r1"), [Problem::IdentityTextInvalid("site")]);
     }
 
     #[test]
