@@ -53,9 +53,27 @@ impl<'de> Deserialize<'de> for StickId {
 
 /// The stick's secret. It has no `Display` and its `Debug` hides the value, so it cannot reach a log by accident.
 /// Call `expose` only where the secret is needed, for example to sign.
-#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct Token(String);
+
+/// Compares every byte, so the time taken does not reveal where two secrets first differ.
+/// (The length is not secret, so a different length can return early.)
+impl PartialEq for Token {
+    fn eq(&self, other: &Self) -> bool {
+        let (a, b) = (self.0.as_bytes(), other.0.as_bytes());
+        if a.len() != b.len() {
+            return false;
+        }
+        let mut difference = 0_u8;
+        for (x, y) in a.iter().zip(b) {
+            difference |= x ^ y;
+        }
+        difference == 0
+    }
+}
+
+impl Eq for Token {}
 
 impl Token {
     #[must_use]
@@ -86,6 +104,14 @@ mod tests {
             assert!(StickId::parse(text).is_err(), "{text:?} should be rejected");
         }
         assert!(serde_json::from_str::<StickId>("\"not valid!\"").is_err());
+    }
+
+    #[test]
+    fn tokens_compare_by_value() {
+        assert_eq!(Token::new("secret"), Token::new("secret"));
+        assert_ne!(Token::new("secret"), Token::new("secreT"));
+        assert_ne!(Token::new("secret"), Token::new("secret2"));
+        assert_ne!(Token::new(""), Token::new("x"));
     }
 
     #[test]

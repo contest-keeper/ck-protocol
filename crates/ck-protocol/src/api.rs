@@ -29,8 +29,11 @@ pub fn is_valid_http_url(url: &str) -> bool {
         return false;
     };
     let host = rest.split(['/', '?', '#']).next().unwrap_or_default();
+    // No "user:password@host": credentials must never travel in an address, and they would be
+    // copied into error messages.
     !host.is_empty()
         && !host.starts_with(':')
+        && !host.contains('@')
         && !url.chars().any(|c| c.is_whitespace() || c.is_control())
 }
 
@@ -54,6 +57,7 @@ mod tests {
             "https://",
             "http://:80",
             "https://a b.org",
+            "https://user:secret@hub.example.org",
         ] {
             assert!(!is_valid_http_url(url), "{url:?} should be invalid");
         }
