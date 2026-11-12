@@ -4,6 +4,7 @@
 //! file, and the EFI partition is edited in place as a FAT volume.
 
 mod copy;
+mod dot_entries;
 mod efi;
 mod error;
 mod gpt;

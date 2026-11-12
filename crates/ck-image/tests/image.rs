@@ -290,3 +290,89 @@ fn writes_settings_into_a_copy_of_the_real_image() {
         br#"{"team":"manual test"}"#
     );
 }
+
+/// The first 32-byte directory entries of the root folder `CK`, read without `fatfs`: the 11-byte
+/// name, whether it is a long-name entry, and the first cluster.
+fn ck_folder_entries(image: &Path, count: usize) -> Vec<(Vec<u8>, bool, u32)> {
+    let base = EFI_FIRST * SECTOR_SIZE;
+    let boot = read_bytes(image, base, 64);
+    let bytes_per_sector = u64::from(u16::from_le_bytes([boot[11], boot[12]]));
+    let cluster_bytes = bytes_per_sector * u64::from(boot[13]);
+    let reserved = u64::from(u16::from_le_bytes([boot[14], boot[15]]));
+    let fat_size = u64::from(u32::from_le_bytes([boot[36], boot[37], boot[38], boot[39]]));
+    let root = u64::from(u32::from_le_bytes([boot[44], boot[45], boot[46], boot[47]]));
+    let data = base + (reserved + u64::from(boot[16]) * fat_size) * bytes_per_sector;
+    let cluster_of = |e: &[u8]| {
+        (u32::from(u16::from_le_bytes([e[20], e[21]])) << 16)
+            | u32::from(u16::from_le_bytes([e[26], e[27]]))
+    };
+
+    let root_bytes = read_bytes(image, data + (root - 2) * cluster_bytes, 512);
+    let ck = root_bytes
+        .chunks(32)
+        .find(|e| e[..11] == *b"CK         " && e[11] & 0x10 != 0)
+        .expect("a CK folder in the root");
+    let folder = read_bytes(
+        image,
+        data + (u64::from(cluster_of(ck)) - 2) * cluster_bytes,
+        512,
+    );
+    folder
+        .chunks(32)
+        .take(count)
+        .map(|e| (e[..11].to_vec(), e[11] == 0x0F, cluster_of(e)))
+        .collect()
+}
+
+#[test]
+fn a_new_folder_starts_with_dot_and_dot_dot_so_linux_fsck_leaves_it_alone() {
+    let dir = TempDir::new().expect("temp dir");
+    let image = make_image(&dir);
+    write_file(&image, "ck/config.json", b"{}").expect("write");
+
+    let entries = ck_folder_entries(&image, 3);
+    assert_eq!(entries[0].0, b".          ", "{entries:?}");
+    assert!(!entries[0].1, "no long-name entry in front of '.'");
+    assert_eq!(entries[1].0, b"..         ", "{entries:?}");
+    assert_eq!(entries[1].2, 0, "'..' of a folder in the root is cluster 0");
+    assert!(entries[2].1, "the long name of config.json follows");
+    assert_eq!(read_file(&image, "ck/config.json").expect("read"), b"{}");
+}
+
+#[test]
+fn a_folder_damaged_by_an_older_version_is_repaired_on_the_next_write() {
+    let dir = TempDir::new().expect("temp dir");
+    let image = make_image(&dir);
+    // Create the folder with fatfs alone, as earlier versions did.
+    {
+        let file = fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(&image)
+            .expect("open");
+        let slice = StreamSlice::new(file, EFI_FIRST * SECTOR_SIZE, (EFI_LAST + 1) * SECTOR_SIZE)
+            .expect("slice");
+        let volume = fatfs::FileSystem::new(slice, fatfs::FsOptions::new()).expect("mount");
+        {
+            let folder = volume.root_dir().create_dir("ck").expect("mkdir");
+            folder
+                .create_file("old.json")
+                .expect("create")
+                .write_all(b"old")
+                .expect("write");
+        }
+        volume.unmount().expect("unmount");
+    }
+    assert!(
+        ck_folder_entries(&image, 1)[0].1,
+        "the control: it starts damaged"
+    );
+
+    write_file(&image, "ck/new.json", b"new").expect("write");
+
+    let entries = ck_folder_entries(&image, 2);
+    assert_eq!(entries[0].0, b".          ");
+    assert_eq!(entries[1].0, b"..         ");
+    assert_eq!(read_file(&image, "ck/old.json").expect("read"), b"old");
+    assert_eq!(read_file(&image, "ck/new.json").expect("read"), b"new");
+}

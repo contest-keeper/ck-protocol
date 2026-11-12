@@ -5,6 +5,7 @@ use std::path::Path;
 use fatfs::{FileSystem, FsOptions};
 use fscommon::{BufStream, StreamSlice};
 
+use crate::dot_entries;
 use crate::error::Error;
 use crate::gpt::{find_efi, read_partitions};
 
@@ -27,7 +28,21 @@ pub fn write_file(image: &Path, path: &str, content: &[u8]) -> Result<(), Error>
         file.write_all(content).map_err(fat)?;
         file.flush().map_err(fat)?;
     }
-    volume.unmount().map_err(fat)
+    volume.unmount().map_err(fat)?;
+    repair_dot_entries(image)
+}
+
+/// `fatfs` writes the `.` and `..` of a new folder in a way Linux `fsck` calls damage and repairs at
+/// every boot, so they are put right after each write. See the `dot_entries` module.
+fn repair_dot_entries(image: &Path) -> Result<(), Error> {
+    let mut file = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open(image)
+        .map_err(|source| Error::io(format!("opening {}", image.display()), source))?;
+    let partitions = read_partitions(&mut file)?;
+    let efi = find_efi(&partitions)?;
+    dot_entries::repair(&mut file, efi.start_byte())
 }
 
 /// Reads a file from the image's EFI partition.
