@@ -266,7 +266,7 @@ mod tests {
             s.branding.wallpaper = Some("../wall.png".to_owned());
             s.branding.bookmarks = vec![Bookmark {
                 title: "Bad".to_owned(),
-                url: "kilonova.ro".to_owned(),
+                url: "judge.example.org".to_owned(),
             }];
             s.branding.home_page = Some("javascript:alert(1)".to_owned());
             s.network.allowed_domains = vec!["not a site".to_owned()];

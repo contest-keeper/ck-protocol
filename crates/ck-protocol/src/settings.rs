@@ -66,10 +66,10 @@ mod tests {
         "stick_id": "03c9f556",
         "created_at": "2026-11-10T15:22:05",
         "token": "abc",
-        "contest": {"name": "RCPC 2026 test", "platform": "kilonova", "contest_id": ""},
+        "contest": {"name": "Example contest", "platform": "kilonova", "contest_id": ""},
         "team": "Test Team",
         "site": "Lab 1",
-        "allowed_domains": [".cppreference.com", ".rcpc.kilonova.ro"],
+        "allowed_domains": [".cppreference.com", ".judge.example.org"],
         "recording": {"mode": "low", "start_delay_s": 60, "start_at": null},
         "api": {"url": "http://10.0.2.2:8088", "heartbeat_s": 15},
         "added_by_a_newer_version": true

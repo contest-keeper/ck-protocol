@@ -32,7 +32,7 @@ mod tests {
 
     #[test]
     fn accepts_site_names_and_rejects_other_text() {
-        for name in ["example.org", ".rcpc.kilonova.ro", "x1.y2.z3"] {
+        for name in ["example.org", ".judge.example.org", "x1.y2.z3"] {
             assert!(is_valid_domain(name), "{name} should be valid");
         }
         let long_label = format!("{}.org", "a".repeat(64));

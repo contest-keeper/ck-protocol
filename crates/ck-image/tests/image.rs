@@ -273,7 +273,7 @@ fn a_failed_copy_leaves_no_partial_file_so_a_retry_works() {
     copy_image(&image, &copy, |_, _| {}).expect("retry works");
 }
 
-/// Run by hand against a COPY of the real image: `CK_TEST_IMAGE=C:\rcpc\copy.img cargo test -p ck-image -- --ignored`.
+/// Run by hand against a COPY of the real image: `CK_TEST_IMAGE=path/to/copy.img cargo test -p ck-image -- --ignored`.
 /// It changes `ck/config.json` inside the file, so never point it at the original.
 #[test]
 #[ignore = "needs a copy of the real image; set CK_TEST_IMAGE"]
