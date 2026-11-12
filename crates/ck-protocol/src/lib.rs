@@ -10,6 +10,7 @@
 pub mod api;
 pub mod branding;
 pub mod contest;
+pub mod event;
 pub mod heartbeat;
 pub mod ids;
 pub mod network;
@@ -21,6 +22,7 @@ pub mod validation;
 pub use api::Api;
 pub use branding::{Bookmark, Branding, render_computer_name};
 pub use contest::{Contest, Platform};
+pub use event::{ChainError, Event, EventKind, FIRST_PREV_HASH, verify_chain};
 pub use heartbeat::{Heartbeat, RecorderState, RecorderStatus};
 pub use ids::{InvalidStickId, StickId, Token};
 pub use network::Network;
