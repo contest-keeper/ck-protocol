@@ -1,5 +1,3 @@
-//! Wall-clock times as an admin types them.
-
 use std::fmt;
 use std::str::FromStr;
 

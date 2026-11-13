@@ -1,5 +1,3 @@
-//! Identifiers and secrets of a stick.
-
 use std::fmt;
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -51,8 +49,8 @@ impl<'de> Deserialize<'de> for StickId {
     }
 }
 
-/// The stick's secret. It has no `Display` and its `Debug` hides the value, so it cannot reach a log by accident.
-/// Call `expose` only where the secret is needed, for example to sign.
+/// The stick's secret. It has no `Display` and its `Debug` hides the value, so it cannot reach a
+/// log by accident.
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct Token(String);

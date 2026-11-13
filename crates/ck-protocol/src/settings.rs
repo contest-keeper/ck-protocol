@@ -1,5 +1,3 @@
-//! The settings an admin chooses, and the file written to one stick.
-
 use serde::{Deserialize, Serialize};
 
 use crate::api::Api;
@@ -61,7 +59,6 @@ pub struct StickConfig {
 }
 
 impl StickConfig {
-    /// The name the machine gets, from the branding pattern, the team, the site and the number.
     #[must_use]
     pub fn computer_name(&self) -> String {
         render_computer_name(

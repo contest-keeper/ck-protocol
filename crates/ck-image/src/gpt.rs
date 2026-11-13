@@ -77,7 +77,6 @@ impl fmt::Debug for Guid {
     }
 }
 
-/// One entry of the partition table.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Partition {
     pub type_guid: Guid,
