@@ -1,5 +1,3 @@
-//! Which sites a contestant may open.
-
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]

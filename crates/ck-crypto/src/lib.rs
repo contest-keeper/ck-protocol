@@ -41,22 +41,18 @@ pub fn sha256_hex(bytes: &[u8]) -> String {
 }
 
 fn mac(token: &Token, body: &[u8]) -> Hmac<Sha256> {
-    // HMAC accepts a key of any length, so this cannot fail.
     let mut mac = Hmac::<Sha256>::new_from_slice(token.expose().as_bytes())
         .expect("HMAC accepts any key length");
     mac.update(body);
     mac
 }
 
-/// Signs a request body.
 pub trait Signer {
     /// The signature of `body`, as text for the `X-CK-Signature` header.
     fn sign(&self, body: &[u8]) -> String;
 }
 
-/// Checks the signature of a request body.
 pub trait Verifier {
-    /// Whether `signature` is valid for `body`.
     fn verify(&self, body: &[u8], signature: &str) -> bool;
 }
 
@@ -64,7 +60,6 @@ pub trait Verifier {
 pub struct HmacSha256(Token);
 
 impl HmacSha256 {
-    /// Uses `token` as the shared secret.
     #[must_use]
     pub fn new(token: Token) -> Self {
         Self(token)

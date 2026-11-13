@@ -45,7 +45,6 @@ fn repair_dot_entries(image: &Path) -> Result<(), Error> {
     dot_entries::repair(&mut file, efi.start_byte())
 }
 
-/// Reads a file from the image's EFI partition.
 pub fn read_file(image: &Path, path: &str) -> Result<Vec<u8>, Error> {
     let (folders, name) = split_path(path)?;
     let volume = open_efi(image, false)?;

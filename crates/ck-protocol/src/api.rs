@@ -1,5 +1,3 @@
-//! Where the stick reports to.
-
 use serde::{Deserialize, Serialize};
 
 /// The stick's secret is not here; it belongs to the stick (see `StickConfig`).

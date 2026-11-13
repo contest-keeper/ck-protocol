@@ -84,13 +84,11 @@ impl Settings {
 
         check_branding(&self.branding, &mut problems);
 
-        problems.extend(
-            self.network
-                .allowed_domains
-                .iter()
-                .filter(|site| !is_valid_domain(site))
-                .map(|site| Problem::SiteNameInvalid(site.clone())),
-        );
+        for site in &self.network.allowed_domains {
+            if !is_valid_domain(site) {
+                problems.push(Problem::SiteNameInvalid(site.clone()));
+            }
+        }
 
         if self.recording.snapshot_interval_s == Some(0) {
             problems.push(Problem::SnapshotIntervalZero);

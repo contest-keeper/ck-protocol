@@ -1,5 +1,3 @@
-//! Which contest the stick is for.
-
 use serde::{Deserialize, Serialize};
 
 use crate::time::LocalDateTime;

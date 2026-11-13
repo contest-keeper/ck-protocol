@@ -1,5 +1,3 @@
-//! The message a stick sends every few seconds to say it is alive.
-
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 

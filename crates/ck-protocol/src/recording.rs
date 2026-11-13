@@ -1,10 +1,7 @@
-//! Screen recording options.
-
 use serde::{Deserialize, Serialize};
 
 use crate::time::LocalDateTime;
 
-/// The modes of the `ck-recorder` service.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum RecordingMode {

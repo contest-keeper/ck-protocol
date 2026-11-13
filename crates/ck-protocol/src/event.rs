@@ -14,9 +14,7 @@ use crate::ids::StickId;
 #[serde(rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum EventKind {
-    /// A contestant logged in to the contest platform.
     Login,
-    /// A contestant submitted a solution.
     Submission,
 }
 
