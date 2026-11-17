@@ -1,4 +1,4 @@
-//! What a stick reports besides heartbeats: a login, a submission.
+//! What a stick reports besides heartbeats: a login, a submission, a batch of network activity.
 //!
 //! Every event carries the hash of the one before it in the same boot, so the Hub can see that
 //! an event is missing or was changed. This crate holds only the data and the check; the hash
@@ -16,6 +16,8 @@ use crate::ids::StickId;
 pub enum EventKind {
     Login,
     Submission,
+    /// A batch of what the stick's proxy carried or refused since the last one: `{"entries": [...]}`.
+    Network,
 }
 
 /// The `prev_hash` of the first event of a boot.
@@ -144,6 +146,16 @@ mod tests {
             serde_json::from_value::<Event>(json).expect("valid"),
             original
         );
+    }
+
+    #[test]
+    fn a_network_event_is_written_as_network() {
+        let mut batch = event(1, FIRST_PREV_HASH, "ana");
+        batch.kind = EventKind::Network;
+        batch.payload = json!({ "entries": [] });
+        let json = serde_json::to_value(&batch).expect("serializes");
+        assert_eq!(json["kind"], "network");
+        assert_eq!(serde_json::from_value::<Event>(json).expect("valid"), batch);
     }
 
     #[test]
