@@ -18,6 +18,8 @@ pub enum EventKind {
     Submission,
     /// A batch of what the stick's proxy carried or refused since the last one: `{"entries": [...]}`.
     Network,
+    /// The stick answering a Hub command; the payload is a `CommandAck`.
+    CommandAck,
 }
 
 /// The `prev_hash` of the first event of a boot.

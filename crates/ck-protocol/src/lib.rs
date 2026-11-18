@@ -9,6 +9,7 @@
 
 pub mod api;
 pub mod branding;
+pub mod command;
 pub mod contest;
 pub mod event;
 pub mod heartbeat;
@@ -23,6 +24,7 @@ pub mod wifi;
 pub use self::time::{LocalDateTime, ParseLocalDateTimeError, ParseTimestampError, Timestamp};
 pub use api::Api;
 pub use branding::{Bookmark, Branding, render_computer_name};
+pub use command::{AckResult, Action, Command, CommandAck, HeartbeatReply, Refusal, SignedCommand};
 pub use contest::{Contest, Platform};
 pub use event::{ChainError, Event, EventKind, FIRST_PREV_HASH, verify_chain};
 pub use heartbeat::{Heartbeat, RecorderState, RecorderStatus};

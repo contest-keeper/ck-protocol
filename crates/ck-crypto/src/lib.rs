@@ -5,7 +5,7 @@
 
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
-use ck_protocol::Token;
+use ck_protocol::{Command, Refusal, SignedCommand, Token};
 use hmac::{Hmac, KeyInit, Mac};
 use sha2::{Digest, Sha256};
 
@@ -32,6 +32,26 @@ pub fn verify(token: &Token, body: &[u8], signature: &str) -> bool {
         return false;
     };
     mac(token, body).verify_slice(&signature).is_ok()
+}
+
+/// Signs a Hub command with the stick's secret.
+#[must_use]
+pub fn sign_command(token: &Token, command: Command) -> SignedCommand {
+    let signature = sign(token, &command.canonical_bytes());
+    SignedCommand { command, signature }
+}
+
+/// Checks the signature of a command. The other checks (stick, expiry, replay) are in
+/// `Command::check` and the agent's list of run ids; see `docs/commands.md`.
+///
+/// # Errors
+/// [`Refusal::BadSignature`] when the signature does not match the command.
+pub fn verify_command(token: &Token, signed: &SignedCommand) -> Result<(), Refusal> {
+    if verify(token, &signed.command.canonical_bytes(), &signed.signature) {
+        Ok(())
+    } else {
+        Err(Refusal::BadSignature)
+    }
 }
 
 /// SHA-256 of `bytes` as lowercase hex, for settings hashes and code fingerprints.
@@ -109,6 +129,27 @@ mod tests {
         assert!(!verify(&token, b"body2", &signature));
         assert!(!verify(&Token::new("other"), b"body", &signature));
         assert!(!verify(&token, b"body", "not hex"));
+    }
+
+    #[test]
+    fn a_signed_command_checks_out_until_it_is_changed() {
+        use ck_protocol::{Action, StickId};
+        let token = Token::new("secret");
+        let command = Command {
+            id: "c-1".to_owned(),
+            stick_id: StickId::parse("s1").expect("id"),
+            issued_at: "2026-11-18T10:00:00Z".parse().expect("time"),
+            expires_at: "2026-11-18T10:05:00Z".parse().expect("time"),
+            action: Action::Shutdown,
+        };
+        let mut signed = sign_command(&token, command);
+        assert_eq!(verify_command(&token, &signed), Ok(()));
+        assert_eq!(
+            verify_command(&Token::new("other"), &signed),
+            Err(Refusal::BadSignature)
+        );
+        signed.command.action = Action::LockScreen;
+        assert_eq!(verify_command(&token, &signed), Err(Refusal::BadSignature));
     }
 
     #[test]
