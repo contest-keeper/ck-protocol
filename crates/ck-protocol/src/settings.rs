@@ -8,8 +8,23 @@ use crate::network::Network;
 use crate::recording::Recording;
 use crate::time::LocalDateTime;
 
-pub const SCHEMA: u32 = 1;
+/// The format version written today: the file lives on the `CKCONFIG` partition.
+pub const SCHEMA: u32 = 2;
 
+/// The first format, kept on the EFI partition as `ck/config.json`. Still read for one release so
+/// sticks made before `CKCONFIG` keep working; the fields are the same.
+pub const LEGACY_SCHEMA: u32 = 1;
+
+/// Volume label of the small FAT partition that holds one stick's identity and settings.
+pub const CONFIG_PARTITION_LABEL: &str = "CKCONFIG";
+
+/// Where the agent mounts it, read-only.
+pub const CONFIG_MOUNT_POINT: &str = "/ck-config";
+
+/// The config file, at the root of the partition. `branding.wallpaper` names a file next to it.
+pub const CONFIG_FILE: &str = "config.json";
+
+/// Where schema 1 kept the file, on the EFI partition.
 pub const ESP_CONFIG_DIR: &str = "ck";
 
 pub const ESP_CONFIG_FILE: &str = "config.json";
@@ -42,7 +57,8 @@ impl Default for Settings {
     }
 }
 
-/// `ck/config.json`: the admin's settings plus the identity of one stick.
+/// `config.json` on the `CKCONFIG` partition: the identity of one stick (id, token) and its settings
+/// (Hub address, contest, wallpaper name, Wi-Fi). Tell versions apart by `schema`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct StickConfig {
     pub schema: u32,

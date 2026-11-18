@@ -3,7 +3,7 @@
 use crate::api::is_valid_http_url;
 use crate::branding::{Branding, COMPUTER_NAME_PLACEHOLDERS};
 use crate::network::is_valid_domain;
-use crate::settings::{SCHEMA, Settings, StickConfig};
+use crate::settings::{LEGACY_SCHEMA, SCHEMA, Settings, StickConfig};
 
 pub const MAX_USB_LABEL_LENGTH: usize = 11;
 
@@ -56,7 +56,9 @@ pub enum Problem {
         "the {0} must be 1 to {MAX_IDENTITY_LENGTH} characters, without line breaks or other control characters"
     )]
     IdentityTextInvalid(&'static str),
-    #[error("the settings file has format version {0}, this program reads version {SCHEMA}")]
+    #[error(
+        "the settings file has format version {0}, this program reads versions {LEGACY_SCHEMA} to {SCHEMA}"
+    )]
     UnsupportedSchema(u32),
     #[error("the machine number must be 1 or more")]
     MachineNumberZero,
@@ -109,7 +111,7 @@ impl StickConfig {
     #[must_use]
     pub fn validate(&self) -> Vec<Problem> {
         let mut problems = Vec::new();
-        if self.schema != SCHEMA {
+        if !(LEGACY_SCHEMA..=SCHEMA).contains(&self.schema) {
             problems.push(Problem::UnsupportedSchema(self.schema));
         }
         if self.machine_number == Some(0) {
@@ -295,8 +297,16 @@ mod tests {
             settings: Settings::default(),
         };
         assert_eq!(config.validate(), NO_PROBLEMS);
-        config.schema = 2;
-        assert_eq!(config.validate(), [Problem::UnsupportedSchema(2)]);
+        config.schema = LEGACY_SCHEMA;
+        assert_eq!(
+            config.validate(),
+            NO_PROBLEMS,
+            "the first format is still read"
+        );
+        config.schema = SCHEMA + 1;
+        assert_eq!(config.validate(), [Problem::UnsupportedSchema(SCHEMA + 1)]);
+        config.schema = 0;
+        assert_eq!(config.validate(), [Problem::UnsupportedSchema(0)]);
         config.schema = SCHEMA;
 
         config.machine_number = Some(0);

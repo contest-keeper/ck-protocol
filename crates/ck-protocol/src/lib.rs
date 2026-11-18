@@ -1,6 +1,6 @@
 //! The data types shared by Keeper OS, Keeper Forge and Keeper Hub.
 //!
-//! The admin tool writes a [`StickConfig`] as `ck/config.json` on the stick's EFI partition. The
+//! The admin tool writes a [`StickConfig`] as `config.json` on the stick's `CKCONFIG` partition. The
 //! agent applies it at boot and sends [`Heartbeat`]s to the Hub. This crate holds only data types
 //! and pure functions: no files, no network and no clock.
 //!
@@ -27,7 +27,10 @@ pub use heartbeat::{Heartbeat, RecorderState, RecorderStatus};
 pub use ids::{InvalidStickId, StickId, Token};
 pub use network::Network;
 pub use recording::{Recording, RecordingMode};
-pub use settings::{ESP_CONFIG_DIR, ESP_CONFIG_FILE, SCHEMA, Settings, StickConfig};
+pub use settings::{
+    CONFIG_FILE, CONFIG_MOUNT_POINT, CONFIG_PARTITION_LABEL, ESP_CONFIG_DIR, ESP_CONFIG_FILE,
+    LEGACY_SCHEMA, SCHEMA, Settings, StickConfig,
+};
 pub use time::{LocalDateTime, ParseLocalDateTimeError};
 pub use validation::Problem;
 
