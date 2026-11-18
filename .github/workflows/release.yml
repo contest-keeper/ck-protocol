@@ -1,8 +1,9 @@
 name: Release
 
+# Only develop may be promoted to main, so the release PR goes into develop and the tag is made there.
 on:
   push:
-    branches: [main]
+    branches: [develop]
 
 permissions:
   contents: write
@@ -11,6 +12,8 @@ permissions:
 jobs:
   release-please:
     uses: contest-keeper/.github/.github/workflows/release-please.yml@main
+    with:
+      target-branch: develop
 
   # Build and upload release files here, e.g.:
   # build:
