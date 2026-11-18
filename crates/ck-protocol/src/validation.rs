@@ -4,6 +4,9 @@ use crate::api::is_valid_http_url;
 use crate::branding::{Branding, COMPUTER_NAME_PLACEHOLDERS};
 use crate::network::is_valid_domain;
 use crate::settings::{SCHEMA, Settings, StickConfig};
+use crate::wifi::{
+    MAX_PASSWORD_LENGTH, MAX_SSID_BYTES, MIN_PASSWORD_LENGTH, is_valid_password, is_valid_ssid,
+};
 
 pub const MAX_USB_LABEL_LENGTH: usize = 11;
 
@@ -48,6 +51,8 @@ pub enum Problem {
     SiteNameInvalid(String),
     #[error("the snapshot interval must be at least 1 second")]
     SnapshotIntervalZero,
+    #[error("the recording retention must be at least 1 day")]
+    RetentionDaysZero,
     #[error("the server address must start with http:// or https:// (got '{0}')")]
     ApiUrlInvalid(String),
     #[error("the heartbeat interval must be at least 1 second")]
@@ -58,6 +63,12 @@ pub enum Problem {
     IdentityTextInvalid(&'static str),
     #[error("the settings file has format version {0}, this program reads version {SCHEMA}")]
     UnsupportedSchema(u32),
+    #[error("the Wi-Fi name must be 1 to {MAX_SSID_BYTES} bytes, without control characters")]
+    WifiSsidInvalid,
+    #[error(
+        "the Wi-Fi password must be {MIN_PASSWORD_LENGTH} to {MAX_PASSWORD_LENGTH} plain ASCII characters"
+    )]
+    WifiPasswordInvalid,
     #[error("the machine number must be 1 or more")]
     MachineNumberZero,
     #[error("the computer name would be empty, so the pattern and the team need letters or digits")]
@@ -94,11 +105,27 @@ impl Settings {
             problems.push(Problem::SnapshotIntervalZero);
         }
 
+        if self.recording.retention_days == Some(0) {
+            problems.push(Problem::RetentionDaysZero);
+        }
+
         if !self.api.url.is_empty() && !is_valid_http_url(&self.api.url) {
             problems.push(Problem::ApiUrlInvalid(self.api.url.clone()));
         }
         if self.api.heartbeat_s == 0 {
             problems.push(Problem::HeartbeatIntervalZero);
+        }
+
+        if let Some(wifi) = &self.wifi {
+            if !is_valid_ssid(&wifi.ssid) {
+                problems.push(Problem::WifiSsidInvalid);
+            }
+            // The password is never copied into a problem, so it cannot end up in a message.
+            if let Some(password) = &wifi.password
+                && !is_valid_password(password.expose())
+            {
+                problems.push(Problem::WifiPasswordInvalid);
+            }
         }
 
         problems
@@ -282,6 +309,37 @@ mod tests {
             s.api.url = "ftp://x.org".to_owned();
         });
         assert_eq!(problems.len(), 5);
+    }
+
+    #[test]
+    fn checks_the_wifi_settings_without_repeating_the_password() {
+        use crate::wifi::{Wifi, WifiPassword};
+        let wifi = |ssid: &str, password: Option<&str>| {
+            problems_with(|s| {
+                s.wifi = Some(Wifi {
+                    ssid: ssid.to_owned(),
+                    password: password.map(WifiPassword::new),
+                });
+            })
+        };
+        assert_eq!(wifi("venue", Some("12345678")), NO_PROBLEMS);
+        assert_eq!(wifi("open", None), NO_PROBLEMS);
+        assert_eq!(wifi("", None), [Problem::WifiSsidInvalid]);
+        assert_eq!(wifi("venue", Some("short")), [Problem::WifiPasswordInvalid]);
+        let message = Problem::WifiPasswordInvalid.to_string();
+        assert!(!message.contains("short"));
+    }
+
+    #[test]
+    fn the_retention_is_at_least_one_day() {
+        assert_eq!(
+            problems_with(|s| s.recording.retention_days = Some(0)),
+            [Problem::RetentionDaysZero]
+        );
+        assert_eq!(
+            problems_with(|s| s.recording.retention_days = Some(30)),
+            NO_PROBLEMS
+        );
     }
 
     #[test]

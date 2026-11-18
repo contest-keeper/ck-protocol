@@ -19,6 +19,7 @@ pub mod recording;
 pub mod settings;
 pub mod time;
 pub mod validation;
+pub mod wifi;
 
 pub use self::time::{LocalDateTime, ParseLocalDateTimeError, ParseTimestampError, Timestamp};
 pub use api::Api;
@@ -29,9 +30,10 @@ pub use event::{ChainError, Event, EventKind, FIRST_PREV_HASH, verify_chain};
 pub use heartbeat::{Heartbeat, RecorderState, RecorderStatus};
 pub use ids::{InvalidStickId, StickId, Token};
 pub use network::Network;
-pub use recording::{Recording, RecordingMode};
+pub use recording::{Recording, RecordingMode, UploadMode};
 pub use settings::{ESP_CONFIG_DIR, ESP_CONFIG_FILE, SCHEMA, Settings, StickConfig};
 pub use validation::Problem;
+pub use wifi::{Wifi, WifiPassword};
 
 pub const STICK_HEADER: &str = "X-CK-Stick";
 pub const SIGNATURE_HEADER: &str = "X-CK-Signature";
