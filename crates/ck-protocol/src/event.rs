@@ -4,11 +4,11 @@
 //! an event is missing or was changed. This crate holds only the data and the check; the hash
 //! function is passed in, because hashing belongs to `ck-crypto`.
 
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::ids::StickId;
+use crate::time::Timestamp;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -33,7 +33,7 @@ pub struct Event {
     /// The hash of the previous event of this boot, or [`FIRST_PREV_HASH`] for the first.
     pub prev_hash: String,
     /// By the stick's clock. The Hub also records its own receive time.
-    pub sent_at: DateTime<Utc>,
+    pub sent_at: Timestamp,
     pub kind: EventKind,
     /// What happened. Its shape depends on `kind` and is fixed with the capture rules (B.3, D.2).
     /// Never a password, a cookie or a session id.
@@ -156,6 +156,15 @@ mod tests {
         let json = serde_json::to_value(&batch).expect("serializes");
         assert_eq!(json["kind"], "network");
         assert_eq!(serde_json::from_value::<Event>(json).expect("valid"), batch);
+    }
+
+    /// Written by the `chrono` version. Re-serializing must give the same bytes, or the hashes of
+    /// events already sent would stop matching.
+    #[test]
+    fn an_event_from_before_the_time_crate_swap_keeps_its_bytes() {
+        let old = r#"{"stick_id":"03c9f556","boot_id":"boot-1","seq":2,"prev_hash":"ab","sent_at":"2026-11-12T10:00:00.250Z","kind":"login","payload":{"platform":"kilonova","username":"ana"}}"#;
+        let parsed: Event = serde_json::from_str(old).expect("old event");
+        assert_eq!(parsed.canonical_bytes(), old.as_bytes());
     }
 
     #[test]

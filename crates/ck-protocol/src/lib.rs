@@ -19,6 +19,7 @@ pub mod settings;
 pub mod time;
 pub mod validation;
 
+pub use self::time::{LocalDateTime, ParseLocalDateTimeError, ParseTimestampError, Timestamp};
 pub use api::Api;
 pub use branding::{Bookmark, Branding, render_computer_name};
 pub use contest::{Contest, Platform};
@@ -28,7 +29,6 @@ pub use ids::{InvalidStickId, StickId, Token};
 pub use network::Network;
 pub use recording::{Recording, RecordingMode};
 pub use settings::{ESP_CONFIG_DIR, ESP_CONFIG_FILE, SCHEMA, Settings, StickConfig};
-pub use time::{LocalDateTime, ParseLocalDateTimeError};
 pub use validation::Problem;
 
 pub const STICK_HEADER: &str = "X-CK-Stick";
