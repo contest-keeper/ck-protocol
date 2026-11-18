@@ -41,6 +41,9 @@ pub struct Settings {
     pub network: Network,
     pub recording: Recording,
     pub api: Api,
+    /// The agent switches Bluetooth off with `rfkill` at every boot. Off by default, so sticks made
+    /// before this setting existed behave as before.
+    pub block_bluetooth: bool,
 }
 
 impl Default for Settings {
@@ -53,6 +56,7 @@ impl Default for Settings {
             network: Network::default(),
             recording: Recording::default(),
             api: Api::default(),
+            block_bluetooth: false,
         }
     }
 }
@@ -119,6 +123,21 @@ mod tests {
             serde_json::from_value::<StickConfig>(json).expect("valid file"),
             config
         );
+    }
+
+    #[test]
+    fn bluetooth_is_not_blocked_unless_asked() {
+        let config: StickConfig = serde_json::from_str(SAMPLE).expect("valid file");
+        assert!(
+            !config.settings.block_bluetooth,
+            "an older file has no setting"
+        );
+
+        let blocked = SAMPLE.replace("\"team\"", "\"block_bluetooth\": true, \"team\"");
+        let config: StickConfig = serde_json::from_str(&blocked).expect("valid file");
+        assert!(config.settings.block_bluetooth);
+        let json = serde_json::to_value(&config).expect("serializes");
+        assert_eq!(json["block_bluetooth"], true);
     }
 
     #[test]

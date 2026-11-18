@@ -1,8 +1,8 @@
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 use crate::ids::StickId;
 use crate::recording::RecordingMode;
+use crate::time::Timestamp;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -27,7 +27,7 @@ pub struct Heartbeat {
     /// Starts at 1 each boot. A gap means a message was lost.
     pub seq: u64,
     /// By the stick's clock. The Hub also records its own receive time.
-    pub sent_at: DateTime<Utc>,
+    pub sent_at: Timestamp,
     pub uptime_s: u64,
     pub hostname: String,
     pub image_version: String,
@@ -65,5 +65,12 @@ mod tests {
             serde_json::from_value::<Heartbeat>(json).expect("valid json"),
             heartbeat
         );
+    }
+
+    #[test]
+    fn a_heartbeat_from_before_the_time_crate_swap_keeps_its_bytes() {
+        let old = r#"{"stick_id":"03c9f556","boot_id":"b","seq":3,"sent_at":"2026-11-10T09:30:00.123456789Z","uptime_s":45,"hostname":"h","image_version":"v","config_sha256":"0","team":"T","site":"S","recording":{"mode":"low","state":"recording"}}"#;
+        let parsed: Heartbeat = serde_json::from_str(old).expect("old heartbeat");
+        assert_eq!(serde_json::to_string(&parsed).expect("json"), old);
     }
 }

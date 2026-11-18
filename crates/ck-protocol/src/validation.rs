@@ -48,6 +48,8 @@ pub enum Problem {
     SiteNameInvalid(String),
     #[error("the snapshot interval must be at least 1 second")]
     SnapshotIntervalZero,
+    #[error("the recording retention must be at least 1 day")]
+    RetentionDaysZero,
     #[error("the server address must start with http:// or https:// (got '{0}')")]
     ApiUrlInvalid(String),
     #[error("the heartbeat interval must be at least 1 second")]
@@ -94,6 +96,10 @@ impl Settings {
 
         if self.recording.snapshot_interval_s == Some(0) {
             problems.push(Problem::SnapshotIntervalZero);
+        }
+
+        if self.recording.retention_days == Some(0) {
+            problems.push(Problem::RetentionDaysZero);
         }
 
         if !self.api.url.is_empty() && !is_valid_http_url(&self.api.url) {
@@ -284,6 +290,18 @@ mod tests {
             s.api.url = "ftp://x.org".to_owned();
         });
         assert_eq!(problems.len(), 5);
+    }
+
+    #[test]
+    fn the_retention_is_at_least_one_day() {
+        assert_eq!(
+            problems_with(|s| s.recording.retention_days = Some(0)),
+            [Problem::RetentionDaysZero]
+        );
+        assert_eq!(
+            problems_with(|s| s.recording.retention_days = Some(30)),
+            NO_PROBLEMS
+        );
     }
 
     #[test]
