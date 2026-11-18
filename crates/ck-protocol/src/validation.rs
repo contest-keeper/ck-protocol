@@ -50,6 +50,8 @@ pub enum Problem {
     SnapshotIntervalZero,
     #[error("the recording retention must be at least 1 day")]
     RetentionDaysZero,
+    #[error("the admin password hash is not a crypt hash like $6$salt$hash")]
+    AdminPasswordHashInvalid,
     #[error("the server address must start with http:// or https:// (got '{0}')")]
     ApiUrlInvalid(String),
     #[error("the heartbeat interval must be at least 1 second")]
@@ -100,6 +102,13 @@ impl Settings {
             problems.push(Problem::RetentionDaysZero);
         }
 
+        if let Some(hash) = &self.admin_password_hash
+            && !is_valid_password_hash(hash)
+        {
+            // The hash is not copied into the problem.
+            problems.push(Problem::AdminPasswordHashInvalid);
+        }
+
         if !self.api.url.is_empty() && !is_valid_http_url(&self.api.url) {
             problems.push(Problem::ApiUrlInvalid(self.api.url.clone()));
         }
@@ -128,6 +137,18 @@ impl StickConfig {
         }
         problems
     }
+}
+
+/// A crypt hash: `$id$...` with no spaces, colons or control characters, so it fits one field of
+/// the `chpasswd -e` input. Plain text and empty values are refused.
+fn is_valid_password_hash(hash: &str) -> bool {
+    let mut parts = hash.split('$');
+    let starts_with_dollar = parts.next() == Some("");
+    let has_id_and_rest = parts.next().is_some_and(|id| !id.is_empty()) && parts.next().is_some();
+    starts_with_dollar
+        && has_id_and_rest
+        && hash.len() <= 256
+        && hash.chars().all(|c| c.is_ascii_graphic() && c != ':')
 }
 
 fn is_valid_identity_text(text: &str) -> bool {
@@ -300,6 +321,25 @@ mod tests {
             problems_with(|s| s.recording.retention_days = Some(30)),
             NO_PROBLEMS
         );
+    }
+
+    #[test]
+    fn the_admin_password_must_be_a_hash() {
+        let hash = |text: &str| problems_with(|s| s.admin_password_hash = Some(text.to_owned()));
+        assert_eq!(hash("$6$salt$abcdef"), NO_PROBLEMS);
+        assert_eq!(hash("$y$j9T$salt$abcdef"), NO_PROBLEMS);
+        for bad in [
+            "",
+            "plain-password",
+            "$",
+            "$6",
+            "$$x",
+            "$6$a b$c",
+            "$6$a:b$c",
+        ] {
+            assert_eq!(hash(bad), [Problem::AdminPasswordHashInvalid], "{bad:?}");
+        }
+        assert_eq!(problems_with(|_| {}), NO_PROBLEMS);
     }
 
     #[test]

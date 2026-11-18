@@ -29,6 +29,11 @@ pub struct Settings {
     /// The agent switches Bluetooth off with `rfkill` at every boot. Off by default, so sticks made
     /// before this setting existed behave as before.
     pub block_bluetooth: bool,
+    /// Password hash for the `icpcadmin` account, in the format `chpasswd -e` takes (for example
+    /// `$6$salt$hash`). Only the hash is stored; the agent applies it at boot. Left out means the
+    /// account keeps the image default.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub admin_password_hash: Option<String>,
 }
 
 impl Default for Settings {
@@ -42,6 +47,7 @@ impl Default for Settings {
             recording: Recording::default(),
             api: Api::default(),
             block_bluetooth: false,
+            admin_password_hash: None,
         }
     }
 }
