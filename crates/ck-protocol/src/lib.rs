@@ -26,7 +26,7 @@ pub use event::{ChainError, Event, EventKind, FIRST_PREV_HASH, verify_chain};
 pub use heartbeat::{Heartbeat, RecorderState, RecorderStatus};
 pub use ids::{InvalidStickId, StickId, Token};
 pub use network::Network;
-pub use recording::{Recording, RecordingMode};
+pub use recording::{Recording, RecordingMode, UploadMode};
 pub use settings::{ESP_CONFIG_DIR, ESP_CONFIG_FILE, SCHEMA, Settings, StickConfig};
 pub use time::{LocalDateTime, ParseLocalDateTimeError};
 pub use validation::Problem;

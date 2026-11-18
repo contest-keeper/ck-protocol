@@ -26,6 +26,20 @@ impl RecordingMode {
     }
 }
 
+/// When recordings leave the stick for the Hub.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[non_exhaustive]
+pub enum UploadMode {
+    /// Recordings stay on the stick.
+    #[default]
+    Keep,
+    /// Upload once the contest has ended.
+    AfterContest,
+    /// Upload while the contest runs, at idle priority.
+    DuringContest,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Recording {
@@ -38,6 +52,10 @@ pub struct Recording {
     /// The recorder uses 10 seconds when this is left out.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub snapshot_interval_s: Option<u64>,
+    pub upload: UploadMode,
+    /// Delete recordings from the stick this many days after they were made. Left out means never.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub retention_days: Option<u32>,
 }
 
 impl Default for Recording {
@@ -47,6 +65,8 @@ impl Default for Recording {
             start_delay_s: 60,
             start_at: None,
             snapshot_interval_s: None,
+            upload: UploadMode::Keep,
+            retention_days: None,
         }
     }
 }
@@ -60,6 +80,26 @@ mod tests {
         for mode in RecordingMode::ALL {
             let json = serde_json::to_string(&mode).expect("serializes");
             assert_eq!(json, format!("\"{}\"", mode.as_str()));
+        }
+    }
+
+    #[test]
+    fn upload_defaults_to_keeping_recordings_and_reads_the_other_modes() {
+        let old: Recording = serde_json::from_str(r#"{"mode":"low"}"#).expect("valid");
+        assert_eq!(old.upload, UploadMode::Keep);
+        assert_eq!(old.retention_days, None);
+        let json = serde_json::to_value(&old).expect("serializes");
+        assert_eq!(json["upload"], "keep");
+        assert!(json.get("retention_days").is_none());
+
+        for (text, mode) in [
+            ("after_contest", UploadMode::AfterContest),
+            ("during_contest", UploadMode::DuringContest),
+        ] {
+            let json = format!(r#"{{"upload":"{text}","retention_days":14}}"#);
+            let recording: Recording = serde_json::from_str(&json).expect("valid");
+            assert_eq!(recording.upload, mode);
+            assert_eq!(recording.retention_days, Some(14));
         }
     }
 }
