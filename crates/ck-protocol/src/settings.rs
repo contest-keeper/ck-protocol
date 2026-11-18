@@ -7,6 +7,7 @@ use crate::ids::{StickId, Token};
 use crate::network::Network;
 use crate::recording::Recording;
 use crate::time::LocalDateTime;
+use crate::wifi::Wifi;
 
 pub const SCHEMA: u32 = 1;
 
@@ -26,6 +27,9 @@ pub struct Settings {
     pub network: Network,
     pub recording: Recording,
     pub api: Api,
+    /// The venue network. The secret inside is written only to the stick's config file.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub wifi: Option<Wifi>,
 }
 
 impl Default for Settings {
@@ -38,6 +42,7 @@ impl Default for Settings {
             network: Network::default(),
             recording: Recording::default(),
             api: Api::default(),
+            wifi: None,
         }
     }
 }

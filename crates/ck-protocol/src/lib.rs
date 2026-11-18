@@ -18,6 +18,7 @@ pub mod recording;
 pub mod settings;
 pub mod time;
 pub mod validation;
+pub mod wifi;
 
 pub use api::Api;
 pub use branding::{Bookmark, Branding, render_computer_name};
@@ -30,6 +31,7 @@ pub use recording::{Recording, RecordingMode};
 pub use settings::{ESP_CONFIG_DIR, ESP_CONFIG_FILE, SCHEMA, Settings, StickConfig};
 pub use time::{LocalDateTime, ParseLocalDateTimeError};
 pub use validation::Problem;
+pub use wifi::{Wifi, WifiPassword};
 
 pub const STICK_HEADER: &str = "X-CK-Stick";
 pub const SIGNATURE_HEADER: &str = "X-CK-Signature";
