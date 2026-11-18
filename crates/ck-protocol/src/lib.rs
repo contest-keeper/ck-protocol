@@ -9,6 +9,7 @@
 
 pub mod api;
 pub mod branding;
+pub mod command;
 pub mod contest;
 pub mod event;
 pub mod heartbeat;
@@ -18,10 +19,12 @@ pub mod recording;
 pub mod settings;
 pub mod time;
 pub mod validation;
+pub mod wifi;
 
 pub use self::time::{LocalDateTime, ParseLocalDateTimeError, ParseTimestampError, Timestamp};
 pub use api::Api;
 pub use branding::{Bookmark, Branding, render_computer_name};
+pub use command::{AckResult, Action, Command, CommandAck, HeartbeatReply, Refusal, SignedCommand};
 pub use contest::{Contest, Platform};
 pub use event::{ChainError, Event, EventKind, FIRST_PREV_HASH, verify_chain};
 pub use heartbeat::{Heartbeat, RecorderState, RecorderStatus};
@@ -33,6 +36,7 @@ pub use settings::{
     LEGACY_SCHEMA, SCHEMA, Settings, StickConfig,
 };
 pub use validation::Problem;
+pub use wifi::{Wifi, WifiPassword};
 
 pub const STICK_HEADER: &str = "X-CK-Stick";
 pub const SIGNATURE_HEADER: &str = "X-CK-Signature";

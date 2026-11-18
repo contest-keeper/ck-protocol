@@ -7,6 +7,7 @@ use crate::ids::{StickId, Token};
 use crate::network::Network;
 use crate::recording::Recording;
 use crate::time::LocalDateTime;
+use crate::wifi::Wifi;
 
 /// The format version written today: the file lives on the `CKCONFIG` partition.
 pub const SCHEMA: u32 = 2;
@@ -41,6 +42,9 @@ pub struct Settings {
     pub network: Network,
     pub recording: Recording,
     pub api: Api,
+    /// The venue network. The secret inside is written only to the stick's config file.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub wifi: Option<Wifi>,
     /// The agent switches Bluetooth off with `rfkill` at every boot. Off by default, so sticks made
     /// before this setting existed behave as before.
     pub block_bluetooth: bool,
@@ -56,6 +60,7 @@ impl Default for Settings {
             network: Network::default(),
             recording: Recording::default(),
             api: Api::default(),
+            wifi: None,
             block_bluetooth: false,
         }
     }
