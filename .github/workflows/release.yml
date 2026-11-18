@@ -14,6 +14,8 @@ jobs:
     uses: contest-keeper/.github/.github/workflows/release-please.yml@main
     with:
       target-branch: develop
+    secrets:
+      token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
 
   # Build and upload release files here, e.g.:
   # build:
