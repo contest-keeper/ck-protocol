@@ -17,6 +17,8 @@ pub enum Error {
     NoEfiPartition,
     #[error("the image has no Linux root partition")]
     NoLinuxPartition,
+    #[error("the image has no CKCONFIG partition")]
+    NoConfigPartition,
     #[error("the EFI partition cannot be read as a FAT volume: {0}")]
     Fat(String),
     #[error("'{0}' is not a valid path inside the EFI partition")]

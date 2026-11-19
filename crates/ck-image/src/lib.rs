@@ -10,6 +10,9 @@ mod error;
 mod gpt;
 
 pub use copy::{copy_image, verify_image};
-pub use efi::{read_file, write_file};
+pub use efi::{has_config_partition, read_config_file, read_file, write_config_file, write_file};
 pub use error::Error;
-pub use gpt::{Guid, Partition, SECTOR_SIZE, find_efi, find_linux_root, read_partitions};
+pub use gpt::{
+    CONFIG_PARTITION_NAME, Guid, Partition, SECTOR_SIZE, find_config, find_efi, find_linux_root,
+    read_partitions, settings_end,
+};
