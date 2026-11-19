@@ -1,4 +1,4 @@
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 
 use crate::api::Api;
 use crate::branding::{Branding, render_computer_name};
@@ -11,6 +11,9 @@ use crate::wifi::Wifi;
 
 /// The format version written today: the file lives on the `CKCONFIG` partition.
 pub const SCHEMA: u32 = 2;
+
+/// CKCONFIG format for a stick that claims its own key on first boot.
+pub const ENROLMENT_SCHEMA: u32 = 3;
 
 /// The first format, kept on the EFI partition as `ck/config.json`. Still read for one release so
 /// sticks made before `CKCONFIG` keep working; the fields are the same.
@@ -101,6 +104,100 @@ impl StickConfig {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(try_from = "Token")]
+pub struct EnrolmentCode(Token);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+#[error("an enrolment code needs five groups of four allowed letters or digits")]
+pub struct InvalidEnrolmentCode;
+
+impl EnrolmentCode {
+    /// # Errors
+    ///
+    /// Returns an error if the code is outside the Hub's canonical format.
+    pub fn parse(text: &str) -> Result<Self, InvalidEnrolmentCode> {
+        Self::try_from(Token::new(text))
+    }
+
+    #[must_use]
+    pub fn expose(&self) -> &str {
+        self.0.expose()
+    }
+}
+
+impl TryFrom<Token> for EnrolmentCode {
+    type Error = InvalidEnrolmentCode;
+
+    fn try_from(token: Token) -> Result<Self, Self::Error> {
+        const ALPHABET: &[u8] = b"ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+        let mut groups = token.expose().split('-');
+        if groups.clone().count() == 5
+            && groups.all(|group| group.len() == 4 && group.bytes().all(|b| ALPHABET.contains(&b)))
+        {
+            Ok(Self(token))
+        } else {
+            Err(InvalidEnrolmentCode)
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EnrolmentConfig {
+    #[serde(deserialize_with = "read_enrolment_schema")]
+    schema: u32,
+    pub stick_id: StickId,
+    pub created_at: LocalDateTime,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub machine_number: Option<u32>,
+    pub enrolment_code: EnrolmentCode,
+    #[serde(
+        rename = "token",
+        default,
+        skip_serializing,
+        deserialize_with = "reject_legacy_token"
+    )]
+    _legacy_token: (),
+    #[serde(flatten)]
+    pub settings: Settings,
+}
+
+impl EnrolmentConfig {
+    #[must_use]
+    pub fn new(
+        stick_id: StickId,
+        created_at: LocalDateTime,
+        machine_number: Option<u32>,
+        enrolment_code: EnrolmentCode,
+        settings: Settings,
+    ) -> Self {
+        Self {
+            schema: ENROLMENT_SCHEMA,
+            stick_id,
+            created_at,
+            machine_number,
+            enrolment_code,
+            _legacy_token: (),
+            settings,
+        }
+    }
+}
+
+fn read_enrolment_schema<'de, D: Deserializer<'de>>(deserializer: D) -> Result<u32, D::Error> {
+    let schema = u32::deserialize(deserializer)?;
+    if schema == ENROLMENT_SCHEMA {
+        Ok(schema)
+    } else {
+        Err(serde::de::Error::custom("expected the enrolment schema"))
+    }
+}
+
+fn reject_legacy_token<'de, D: Deserializer<'de>>(_: D) -> Result<(), D::Error> {
+    Err(serde::de::Error::custom(
+        "an enrolment config cannot carry a legacy stick token",
+    ))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -177,5 +274,48 @@ mod tests {
         assert!(
             serde_json::from_str::<StickConfig>(&SAMPLE.replace("03c9f556", "bad id")).is_err()
         );
+    }
+
+    #[test]
+    fn enrolment_config_writes_a_code_instead_of_a_long_lived_key() {
+        let legacy: StickConfig = serde_json::from_str(SAMPLE).expect("legacy config");
+        let code = EnrolmentCode::parse("ABCD-EFGH-JKLM-NPQR-STUV").expect("valid code");
+        let config = EnrolmentConfig::new(
+            legacy.stick_id,
+            legacy.created_at,
+            Some(7),
+            code,
+            legacy.settings,
+        );
+        let json = serde_json::to_value(&config).expect("writes the config");
+        assert_eq!(json["schema"], ENROLMENT_SCHEMA);
+        assert_eq!(json["enrolment_code"], "ABCD-EFGH-JKLM-NPQR-STUV");
+        assert!(json.get("token").is_none());
+        assert!(serde_json::from_value::<StickConfig>(json.clone()).is_err());
+        assert_eq!(
+            serde_json::from_value::<EnrolmentConfig>(json.clone()).expect("reads the config"),
+            config
+        );
+        assert!(!format!("{config:?}").contains("ABCD-EFGH"));
+
+        let mut wrong_schema = json.clone();
+        wrong_schema["schema"] = serde_json::json!(SCHEMA);
+        assert!(serde_json::from_value::<EnrolmentConfig>(wrong_schema).is_err());
+
+        let mut mixed = json;
+        mixed["token"] = serde_json::Value::Null;
+        assert!(serde_json::from_value::<EnrolmentConfig>(mixed).is_err());
+    }
+
+    #[test]
+    fn an_enrolment_code_has_the_hubs_canonical_format() {
+        for bad in [
+            "",
+            "ABCD-EFGH-IJKL-MNOP-QRST",
+            "abcd-EFGH-JKLM-NPQR-STUV",
+            "ABCDEFGHJKLMNPQRSTUV",
+        ] {
+            assert!(EnrolmentCode::parse(bad).is_err());
+        }
     }
 }

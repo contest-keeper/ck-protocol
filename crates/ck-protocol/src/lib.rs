@@ -32,8 +32,9 @@ pub use ids::{InvalidStickId, StickId, Token};
 pub use network::Network;
 pub use recording::{Recording, RecordingMode, UploadMode};
 pub use settings::{
-    CONFIG_FILE, CONFIG_MOUNT_POINT, CONFIG_PARTITION_LABEL, ESP_CONFIG_DIR, ESP_CONFIG_FILE,
-    LEGACY_SCHEMA, SCHEMA, Settings, StickConfig,
+    CONFIG_FILE, CONFIG_MOUNT_POINT, CONFIG_PARTITION_LABEL, ENROLMENT_SCHEMA, ESP_CONFIG_DIR,
+    ESP_CONFIG_FILE, EnrolmentCode, EnrolmentConfig, InvalidEnrolmentCode, LEGACY_SCHEMA, SCHEMA,
+    Settings, StickConfig,
 };
 pub use validation::Problem;
 pub use wifi::{Wifi, WifiPassword};
