@@ -27,6 +27,7 @@ pub enum Action {
         text: String,
     },
     LockScreen,
+    UnlockScreen,
     Shutdown,
 }
 
@@ -178,6 +179,18 @@ mod tests {
         assert_eq!(json["action"], serde_json::json!({"type": "lock_screen"}));
         let json = serde_json::to_value(command(Action::Shutdown)).expect("json");
         assert_eq!(json["action"], serde_json::json!({"type": "shutdown"}));
+    }
+
+    #[test]
+    fn an_unlock_command_round_trips_with_the_same_type_tag() {
+        let action = serde_json::json!({"type": "unlock_screen"});
+        let unlock: Action = serde_json::from_value(action.clone()).expect("known action");
+        let command = command(unlock);
+        assert_eq!(command.check(&stick(), at("2026-11-18T10:01:00Z")), Ok(()));
+        assert_eq!(
+            serde_json::to_value(command).expect("json")["action"],
+            action
+        );
     }
 
     #[test]
