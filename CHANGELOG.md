@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/contest-keeper/ck-protocol/compare/v0.2.0...v0.3.0) (2026-11-19)
+
+
+### Features
+
+* read and write files on the ckconfig partition in ck-image ([#35](https://github.com/contest-keeper/ck-protocol/issues/35)) ([407dc1c](https://github.com/contest-keeper/ck-protocol/commit/407dc1c61070b5c37c6c32b3e3decc317e7e31d4))
+
 ## [0.2.0](https://github.com/contest-keeper/ck-protocol/compare/v0.1.0...v0.2.0) (2026-11-18)
 
 
