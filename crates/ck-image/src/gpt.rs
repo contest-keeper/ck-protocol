@@ -14,6 +14,9 @@ const MIN_ENTRY_SIZE: u32 = 128;
 /// The standard size is 128; the format allows larger powers of two, but nothing real needs more.
 const MAX_ENTRY_SIZE: u32 = 4096;
 
+/// The GPT name (and FAT label) of the partition that holds the stick's settings.
+pub const CONFIG_PARTITION_NAME: &str = "CKCONFIG";
+
 /// A partition type id, kept as stored on disk (the first three fields are little-endian).
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct Guid([u8; 16]);
@@ -28,6 +31,11 @@ impl Guid {
     pub const LINUX_FILESYSTEM: Self = Self([
         0xAF, 0x3D, 0xC6, 0x0F, 0x83, 0x84, 0x72, 0x47, 0x8E, 0x79, 0x3D, 0x69, 0xD8, 0x47, 0x7D,
         0xE4,
+    ]);
+    /// EBD0A0A2-B9E5-4433-87C0-68B6B72699C7 (Microsoft basic data, what a FAT data partition uses)
+    pub const BASIC_DATA: Self = Self([
+        0xA2, 0xA0, 0xD0, 0xEB, 0xE5, 0xB9, 0x33, 0x44, 0x87, 0xC0, 0x68, 0xB6, 0xB7, 0x26, 0x99,
+        0xC7,
     ]);
 
     #[must_use]
@@ -183,6 +191,42 @@ pub fn find_efi(partitions: &[Partition]) -> Result<&Partition, Error> {
         .iter()
         .find(|p| p.type_guid == Guid::EFI_SYSTEM)
         .ok_or(Error::NoEfiPartition)
+}
+
+/// The partition that holds the stick's settings, if the image has one: the partition whose GPT name
+/// is `CKCONFIG`, or else the first basic-data partition between the EFI partition and the Linux
+/// root. An image from before the config partition has none.
+#[must_use]
+pub fn find_config(partitions: &[Partition]) -> Option<&Partition> {
+    if let Some(named) = partitions.iter().find(|p| p.name == CONFIG_PARTITION_NAME) {
+        return Some(named);
+    }
+    let efi = find_efi(partitions).ok()?;
+    let root = find_linux_root(partitions).ok()?;
+    partitions.iter().find(|p| {
+        p.type_guid == Guid::BASIC_DATA
+            && p.first_sector > efi.last_sector
+            && p.last_sector < root.first_sector
+    })
+}
+
+/// Where the part of an image that differs from stick to stick ends: the end of the EFI partition,
+/// or of the config partition when there is one. Everything before this offset can be changed by
+/// Forge; everything after it is the shared base image. The config partition must lie before the
+/// Linux root, so this range stays one piece at the start of the disk.
+pub fn settings_end(partitions: &[Partition]) -> Result<u64, Error> {
+    let efi_end = find_efi(partitions)?.end_byte();
+    let Some(config) = find_config(partitions) else {
+        return Ok(efi_end);
+    };
+    if let Ok(root) = find_linux_root(partitions)
+        && root.start_byte() < config.end_byte()
+    {
+        return Err(Error::BadPartitionTable(
+            "the config partition is not before the Linux root partition",
+        ));
+    }
+    Ok(efi_end.max(config.end_byte()))
 }
 
 /// The first Linux filesystem partition, the root of the contest system.
