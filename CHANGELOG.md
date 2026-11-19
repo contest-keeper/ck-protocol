@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.4.0](https://github.com/contest-keeper/ck-protocol/compare/v0.3.0...v0.4.0) (2026-11-19)
+
+
+### Features
+
+* add the first boot enrolment config ([293131b](https://github.com/contest-keeper/ck-protocol/commit/293131bab0de9c55d508d04f446b3803420f1ec0))
+* add the signed screen unlock action ([e2c72b0](https://github.com/contest-keeper/ck-protocol/commit/e2c72b0378696447049a0dbe9df29e87bca2b46d))
+
 ## [0.3.0](https://github.com/contest-keeper/ck-protocol/compare/v0.2.0...v0.3.0) (2026-11-19)
 
 
