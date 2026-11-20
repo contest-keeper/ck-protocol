@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0](https://github.com/contest-keeper/ck-protocol/compare/v0.4.0...v0.5.0) (2026-11-20)
+
+
+### Features
+
+* add signed stick settings ([#40](https://github.com/contest-keeper/ck-protocol/issues/40)) ([f4796fe](https://github.com/contest-keeper/ck-protocol/commit/f4796fe7f0546076f1013fb842f85af30dbfb05d))
+
 ## [0.4.0](https://github.com/contest-keeper/ck-protocol/compare/v0.3.0...v0.4.0) (2026-11-19)
 
 
