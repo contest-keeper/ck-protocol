@@ -28,6 +28,10 @@ pub const CONFIG_MOUNT_POINT: &str = "/ck-config";
 /// The config file, at the root of the partition. `branding.wallpaper` names a file next to it.
 pub const CONFIG_FILE: &str = "config.json";
 
+/// Where an image lists the public keys that may sign stick settings, one per line. An image that
+/// has this file refuses settings without a valid signature from one of them.
+pub const CONFIG_PUBLIC_KEYS_PATH: &str = "/etc/ck/config-public-keys";
+
 /// Where schema 1 kept the file, on the EFI partition.
 pub const ESP_CONFIG_DIR: &str = "ck";
 
