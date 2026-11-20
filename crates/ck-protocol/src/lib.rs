@@ -27,14 +27,14 @@ pub use branding::{Bookmark, Branding, render_computer_name};
 pub use command::{AckResult, Action, Command, CommandAck, HeartbeatReply, Refusal, SignedCommand};
 pub use contest::{Contest, Platform};
 pub use event::{ChainError, Event, EventKind, FIRST_PREV_HASH, verify_chain};
-pub use heartbeat::{Heartbeat, RecorderState, RecorderStatus};
+pub use heartbeat::{ConfigTrust, Heartbeat, RecorderState, RecorderStatus};
 pub use ids::{InvalidStickId, StickId, Token};
 pub use network::Network;
 pub use recording::{Recording, RecordingMode, UploadMode};
 pub use settings::{
-    CONFIG_FILE, CONFIG_MOUNT_POINT, CONFIG_PARTITION_LABEL, ENROLMENT_SCHEMA, ESP_CONFIG_DIR,
-    ESP_CONFIG_FILE, EnrolmentCode, EnrolmentConfig, InvalidEnrolmentCode, LEGACY_SCHEMA, SCHEMA,
-    Settings, StickConfig,
+    CONFIG_FILE, CONFIG_MOUNT_POINT, CONFIG_PARTITION_LABEL, CONFIG_PUBLIC_KEYS_PATH,
+    ENROLMENT_SCHEMA, ESP_CONFIG_DIR, ESP_CONFIG_FILE, EnrolmentCode, EnrolmentConfig,
+    InvalidEnrolmentCode, LEGACY_SCHEMA, SCHEMA, Settings, StickConfig,
 };
 pub use validation::Problem;
 pub use wifi::{Wifi, WifiPassword};

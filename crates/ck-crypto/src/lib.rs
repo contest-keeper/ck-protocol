@@ -3,6 +3,13 @@
 //! Signing sits behind the [`Signer`] and [`Verifier`] traits, so Ed25519 can replace HMAC later
 //! without changes in the programs that use them.
 
+mod config_signature;
+
+pub use config_signature::{
+    CONFIG_SIGNATURE_FILE, ConfigSignature, ConfigSigningKey, ConfigVerifyingKey, SignatureError,
+    parse_verifying_keys, verify_config,
+};
+
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use ck_protocol::{Command, Refusal, SignedCommand, Token};
