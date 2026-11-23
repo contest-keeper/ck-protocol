@@ -1,7 +1,4 @@
 //! Stick secrets and the signatures that prove a report came from a stick.
-//!
-//! Signing sits behind the [`Signer`] and [`Verifier`] traits, so Ed25519 can replace HMAC later
-//! without changes in the programs that use them.
 
 mod config_signature;
 
@@ -74,37 +71,6 @@ fn mac(token: &Token, body: &[u8]) -> Hmac<Sha256> {
     mac
 }
 
-pub trait Signer {
-    /// The signature of `body`, as text for the `X-CK-Signature` header.
-    fn sign(&self, body: &[u8]) -> String;
-}
-
-pub trait Verifier {
-    fn verify(&self, body: &[u8], signature: &str) -> bool;
-}
-
-/// HMAC-SHA256 with one stick's secret. Both sides hold the same secret.
-pub struct HmacSha256(Token);
-
-impl HmacSha256 {
-    #[must_use]
-    pub fn new(token: Token) -> Self {
-        Self(token)
-    }
-}
-
-impl Signer for HmacSha256 {
-    fn sign(&self, body: &[u8]) -> String {
-        sign(&self.0, body)
-    }
-}
-
-impl Verifier for HmacSha256 {
-    fn verify(&self, body: &[u8], signature: &str) -> bool {
-        verify(&self.0, body, signature)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -157,13 +123,6 @@ mod tests {
         );
         signed.command.action = Action::LockScreen;
         assert_eq!(verify_command(&token, &signed), Err(Refusal::BadSignature));
-    }
-
-    #[test]
-    fn a_signer_and_a_verifier_with_the_same_secret_agree() {
-        let stick = HmacSha256::new(Token::new("secret"));
-        let signature = stick.sign(b"body");
-        assert!(stick.verify(b"body", &signature));
     }
 
     #[test]
