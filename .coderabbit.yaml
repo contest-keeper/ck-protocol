@@ -1,0 +1,20 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+language: en-US
+reviews:
+  profile: assertive
+  auto_review:
+    enabled: true
+    base_branches: ["^develop$"]
+    ignore_usernames: ["dependabot[bot]"]
+  tools:
+    shellcheck:
+      enabled: true
+    clippy:
+      enabled: true
+  path_instructions:
+    - path: "crates/ck-crypto/**"
+      instructions: |
+        Security-critical: signing, hashing and key handling. Check constant-time compares, key and secret handling, no logging of secrets, and that every verify path rejects on any error.
+    - path: "crates/ck-image/**"
+      instructions: |
+        Parses untrusted disk images (GPT, FAT, CKCONFIG). Check bounds, integer overflow, allocation limits and that malformed input returns an error instead of panicking or writing outside the intended partition.
