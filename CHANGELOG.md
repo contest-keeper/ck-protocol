@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.0](https://github.com/contest-keeper/ck-protocol/compare/v0.5.1...v0.6.0) (2026-11-24)
+
+
+### Features
+
+* add the block_usb_storage setting ([#52](https://github.com/contest-keeper/ck-protocol/issues/52)) ([9af064a](https://github.com/contest-keeper/ck-protocol/commit/9af064ac5e9b1d1fd788485a329c98ac46c1f98a))
+
 ## [0.5.1](https://github.com/contest-keeper/ck-protocol/compare/v0.5.0...v0.5.1) (2026-11-24)
 
 
