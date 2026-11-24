@@ -55,6 +55,11 @@ pub struct Settings {
     /// The agent switches Bluetooth off with `rfkill` at every boot. Off by default, so sticks made
     /// before this setting existed behave as before.
     pub block_bluetooth: bool,
+    /// The agent stops USB mass-storage devices other than the stick it booted from. Off by
+    /// default, and left out of the file while off, so a file made before this setting existed is
+    /// written back byte for byte.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub block_usb_storage: bool,
     /// Password hash for the `icpcadmin` account, in the format `chpasswd -e` takes (for example
     /// `$6$salt$hash`). Only the hash is stored; the agent applies it at boot. Left out means the
     /// account keeps the image default.
@@ -74,6 +79,7 @@ impl Default for Settings {
             api: Api::default(),
             wifi: None,
             block_bluetooth: false,
+            block_usb_storage: false,
             admin_password_hash: None,
         }
     }
@@ -235,6 +241,20 @@ mod tests {
             serde_json::from_value::<StickConfig>(json).expect("valid file"),
             config
         );
+    }
+
+    #[test]
+    fn usb_storage_is_not_blocked_unless_asked_and_an_old_file_keeps_its_bytes() {
+        let config: StickConfig = serde_json::from_str(SAMPLE).expect("valid file");
+        assert!(!config.settings.block_usb_storage);
+        let written = serde_json::to_value(&config).expect("serializes");
+        assert!(written.get("block_usb_storage").is_none());
+
+        let blocked = SAMPLE.replace("\"team\"", "\"block_usb_storage\": true, \"team\"");
+        let config: StickConfig = serde_json::from_str(&blocked).expect("valid file");
+        assert!(config.settings.block_usb_storage);
+        let json = serde_json::to_value(&config).expect("serializes");
+        assert_eq!(json["block_usb_storage"], true);
     }
 
     #[test]
