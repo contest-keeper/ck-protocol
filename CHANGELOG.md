@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.1](https://github.com/contest-keeper/ck-protocol/compare/v0.5.0...v0.5.1) (2026-11-24)
+
+
+### Bug Fixes
+
+* refuse wallpaper names with a colon or control characters ([#49](https://github.com/contest-keeper/ck-protocol/issues/49)) ([02e1813](https://github.com/contest-keeper/ck-protocol/commit/02e18132f7700eedd9ee9681c032b8fc72d1a71e))
+
 ## [0.5.0](https://github.com/contest-keeper/ck-protocol/compare/v0.4.0...v0.5.0) (2026-11-20)
 
 
