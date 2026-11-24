@@ -185,7 +185,10 @@ fn check_branding(branding: &Branding, problems: &mut Vec<Problem>) {
 
     if let Some(wallpaper) = &branding.wallpaper
         && (wallpaper.is_empty()
-            || wallpaper.contains(['/', '\\'])
+            // A colon makes a drive-relative path or an alternate data stream on Windows, and a
+            // control character can hide the real name.
+            || wallpaper.contains(['/', '\\', ':'])
+            || wallpaper.chars().any(char::is_control)
             || wallpaper == "."
             || wallpaper == "..")
     {
@@ -332,6 +335,23 @@ mod tests {
             s.api.url = "ftp://x.org".to_owned();
         });
         assert_eq!(problems.len(), 5);
+    }
+
+    #[test]
+    fn a_wallpaper_name_cannot_reach_another_drive_or_stream() {
+        for name in [
+            "C:wall.png",
+            "wall.png:stream",
+            "wall\n.png",
+            "wall\u{0}.png",
+        ] {
+            let problems = problems_with(|s| s.branding.wallpaper = Some(name.to_owned()));
+            assert_eq!(
+                problems,
+                [Problem::WallpaperNotAFileName(name.to_owned())],
+                "{name:?}"
+            );
+        }
     }
 
     #[test]
