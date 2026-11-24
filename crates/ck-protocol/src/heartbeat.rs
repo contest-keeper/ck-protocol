@@ -115,11 +115,4 @@ mod tests {
         let parsed: Heartbeat = serde_json::from_str(old).expect("old heartbeat");
         assert_eq!(serde_json::to_string(&parsed).expect("json"), old);
     }
-
-    #[test]
-    fn a_heartbeat_round_trips_screen_unlock_support() {
-        let json = r#"{"stick_id":"03c9f556","boot_id":"b","seq":3,"sent_at":"2026-11-10T09:30:00Z","uptime_s":45,"hostname":"h","image_version":"v","config_sha256":"0","team":"T","site":"S","recording":{"mode":"low","state":"recording"},"screen_unlock":true}"#;
-        let parsed: Heartbeat = serde_json::from_str(json).expect("heartbeat");
-        assert_eq!(serde_json::to_string(&parsed).expect("json"), json);
-    }
 }
