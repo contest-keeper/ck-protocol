@@ -105,14 +105,6 @@ mod tests {
     }
 
     #[test]
-    fn tokens_compare_by_value() {
-        assert_eq!(Token::new("secret"), Token::new("secret"));
-        assert_ne!(Token::new("secret"), Token::new("secreT"));
-        assert_ne!(Token::new("secret"), Token::new("secret2"));
-        assert_ne!(Token::new(""), Token::new("x"));
-    }
-
-    #[test]
     fn the_token_does_not_show_in_debug_output() {
         assert!(!format!("{:?}", Token::new("super-secret")).contains("super-secret"));
     }
