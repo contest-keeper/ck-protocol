@@ -167,9 +167,13 @@ impl StickConfig {
 fn is_valid_password_hash(hash: &str) -> bool {
     let mut parts = hash.split('$');
     let starts_with_dollar = parts.next() == Some("");
-    let has_id_and_rest = parts.next().is_some_and(|id| !id.is_empty()) && parts.next().is_some();
+    let has_id = parts.next().is_some_and(|id| !id.is_empty());
+    // `$6$` or `$6$$` would pass chpasswd and then no password would ever match.
+    let has_salt_and_hash = parts.next().is_some_and(|salt| !salt.is_empty())
+        && parts.next().is_some_and(|hash| !hash.is_empty());
     starts_with_dollar
-        && has_id_and_rest
+        && has_id
+        && has_salt_and_hash
         && hash.len() <= 256
         && hash.chars().all(|c| c.is_ascii_graphic() && c != ':')
 }
@@ -396,6 +400,9 @@ mod tests {
             "$",
             "$6",
             "$$x",
+            "$6$",
+            "$6$$",
+            "$6$salt$",
             "$6$a b$c",
             "$6$a:b$c",
         ] {
