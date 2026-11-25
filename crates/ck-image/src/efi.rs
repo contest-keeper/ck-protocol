@@ -100,7 +100,7 @@ fn repair_dot_entries(image: &Path) -> Result<(), Error> {
         .map_err(|source| Error::io(format!("opening {}", image.display()), source))?;
     let partitions = read_partitions(&mut file)?;
     let efi = find_efi(&partitions)?;
-    dot_entries::repair(&mut file, efi.start_byte())
+    dot_entries::repair(&mut file, efi.start_byte(), efi.end_byte())
 }
 
 pub fn read_file(image: &Path, path: &str) -> Result<Vec<u8>, Error> {

@@ -23,10 +23,11 @@ const DOT_DOT: &[u8; 11] = b"..         ";
 /// A directory with more clusters than this is not one we made, so it is left alone.
 const MAX_DIRECTORY_CLUSTERS: usize = 256;
 const MAX_DEPTH: usize = 16;
+const MAX_CLUSTER_BYTES: u64 = 64 * 1024;
 
 /// Fixes every directory of the FAT32 volume that starts at byte `base` of `file`.
-pub(crate) fn repair(file: &mut File, base: u64) -> Result<(), Error> {
-    let Some(volume) = Volume::read(file, base)? else {
+pub(crate) fn repair(file: &mut File, base: u64, end: u64) -> Result<(), Error> {
+    let Some(volume) = Volume::read(file, base, end)? else {
         return Ok(());
     };
     let mut seen = HashSet::new();
@@ -37,11 +38,13 @@ struct Volume {
     cluster_bytes: u64,
     fat_start: u64,
     data_start: u64,
+    /// First byte after the partition. Nothing is read or written from here on.
+    end: u64,
     root: u32,
 }
 
 impl Volume {
-    fn read(file: &mut File, base: u64) -> Result<Option<Self>, Error> {
+    fn read(file: &mut File, base: u64, end: u64) -> Result<Option<Self>, Error> {
         let mut boot = [0_u8; 64];
         seek(file, base)?;
         if file.read_exact(&mut boot).is_err() {
@@ -54,19 +57,35 @@ impl Volume {
         let fat_size = u64::from(u32::from_le_bytes([boot[36], boot[37], boot[38], boot[39]]));
         let root = u32::from_le_bytes([boot[44], boot[45], boot[46], boot[47]]);
         // FAT12 and FAT16 have no 32-bit FAT size.
-        if fat_size == 0 || bytes_per_sector < 512 || sectors_per_cluster == 0 || root < 2 {
+        // A sector size that is not a power of two, or a cluster over 64 KiB, is not a volume we
+        // made, and would make a directory read allocate up to 4 GB.
+        let cluster_bytes = bytes_per_sector * sectors_per_cluster;
+        if fat_size == 0
+            || !(512..=4096).contains(&bytes_per_sector)
+            || !bytes_per_sector.is_power_of_two()
+            || sectors_per_cluster == 0
+            || cluster_bytes > MAX_CLUSTER_BYTES
+            || root < 2
+        {
             return Ok(None);
         }
         Ok(Some(Self {
-            cluster_bytes: bytes_per_sector * sectors_per_cluster,
+            cluster_bytes,
             fat_start: base + reserved * bytes_per_sector,
             data_start: base + (reserved + fats * fat_size) * bytes_per_sector,
+            end,
             root,
         }))
     }
 
     fn cluster_offset(&self, cluster: u32) -> u64 {
         self.data_start + u64::from(cluster - 2) * self.cluster_bytes
+    }
+
+    /// A damaged chain or directory entry can name a cluster past the partition; writing there
+    /// would overwrite the Linux root or another partition.
+    fn holds(&self, cluster: u32) -> bool {
+        cluster >= 2 && self.cluster_offset(cluster) + self.cluster_bytes <= self.end
     }
 
     fn next(&self, file: &mut File, cluster: u32) -> Result<u32, Error> {
@@ -100,7 +119,10 @@ fn repair_directory(
         return Ok(());
     }
     let clusters = volume.chain(file, cluster)?;
-    if clusters.is_empty() || clusters.len() > MAX_DIRECTORY_CLUSTERS {
+    if clusters.is_empty()
+        || clusters.len() > MAX_DIRECTORY_CLUSTERS
+        || !clusters.iter().all(|c| volume.holds(*c))
+    {
         return Ok(());
     }
     let mut bytes = read_clusters(file, volume, &clusters)?;
@@ -271,5 +293,69 @@ mod tests {
             entry(b"NOTES   TXT", 0x20, 9),
         ];
         assert_eq!(fixed_entries(&bytes_of(&entries), 7, 3), entries);
+    }
+
+    /// A 1 MiB file whose first 64 KiB is the "partition": a tiny FAT32 boot sector, then a
+    /// directory at `root` holding `LFN, ".", ".."`.
+    fn image_with_root_at(
+        root: u32,
+        sector_size: u16,
+        sectors_per_cluster: u8,
+    ) -> tempfile::NamedTempFile {
+        let mut disk = vec![0_u8; 1 << 20];
+        disk[11..13].copy_from_slice(&sector_size.to_le_bytes());
+        disk[13] = sectors_per_cluster;
+        disk[14..16].copy_from_slice(&1_u16.to_le_bytes());
+        disk[16] = 1;
+        disk[36..40].copy_from_slice(&1_u32.to_le_bytes());
+        disk[44..48].copy_from_slice(&root.to_le_bytes());
+        // data starts at (1 reserved + 1 FAT sector) * 512
+        let at = 1024 + (root as usize - 2) * 512;
+        if at + 96 <= disk.len() {
+            disk[at..at + 96].copy_from_slice(
+                &[
+                    long_name(),
+                    entry(DOT, ATTR_DIRECTORY, root),
+                    entry(DOT_DOT, ATTR_DIRECTORY, 0),
+                ]
+                .concat(),
+            );
+        }
+        let mut file = tempfile::NamedTempFile::new().unwrap();
+        file.write_all(&disk).unwrap();
+        file
+    }
+
+    #[test]
+    fn leaves_a_directory_outside_the_partition_alone() {
+        let image = image_with_root_at(200, 512, 1);
+        let before = std::fs::read(image.path()).unwrap();
+        let mut file = std::fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(image.path())
+            .unwrap();
+        repair(&mut file, 0, 64 * 1024).unwrap();
+        assert_eq!(std::fs::read(image.path()).unwrap(), before);
+    }
+
+    #[test]
+    fn repairs_a_directory_inside_the_partition() {
+        let image = image_with_root_at(2, 512, 1);
+        let before = std::fs::read(image.path()).unwrap();
+        let mut file = std::fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(image.path())
+            .unwrap();
+        repair(&mut file, 0, 64 * 1024).unwrap();
+        assert_ne!(std::fs::read(image.path()).unwrap(), before);
+    }
+
+    #[test]
+    fn refuses_a_boot_sector_with_a_huge_cluster() {
+        let image = image_with_root_at(2, 65535, 255);
+        let mut file = File::open(image.path()).unwrap();
+        assert!(Volume::read(&mut file, 0, 1 << 20).unwrap().is_none());
     }
 }
