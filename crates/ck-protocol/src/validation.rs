@@ -1,6 +1,6 @@
 //! Checks on the settings, with problems described in plain words for the admin.
 
-use crate::api::is_valid_http_url;
+use crate::api::{is_valid_http_url, is_valid_hub_url};
 use crate::branding::{Branding, COMPUTER_NAME_PLACEHOLDERS};
 use crate::network::is_valid_domain;
 use crate::settings::{LEGACY_SCHEMA, SCHEMA, Settings, StickConfig};
@@ -57,6 +57,8 @@ pub enum Problem {
     AdminPasswordHashInvalid,
     #[error("the server address must start with http:// or https:// (got '{0}')")]
     ApiUrlInvalid(String),
+    #[error("the server address must use https:// (http:// only for localhost), got '{0}'")]
+    ApiUrlNotSecure(String),
     #[error("the heartbeat interval must be at least 1 second")]
     HeartbeatIntervalZero,
     #[error(
@@ -122,8 +124,13 @@ impl Settings {
             problems.push(Problem::AdminPasswordHashInvalid);
         }
 
-        if !self.api.url.is_empty() && !is_valid_http_url(&self.api.url) {
-            problems.push(Problem::ApiUrlInvalid(self.api.url.clone()));
+        if !self.api.url.is_empty() {
+            if !is_valid_http_url(&self.api.url) {
+                problems.push(Problem::ApiUrlInvalid(self.api.url.clone()));
+            } else if !is_valid_hub_url(&self.api.url) {
+                // The agent sends the enrolment code only over https or to this machine.
+                problems.push(Problem::ApiUrlNotSecure(self.api.url.clone()));
+            }
         }
         if self.api.heartbeat_s == 0 {
             problems.push(Problem::HeartbeatIntervalZero);
@@ -345,6 +352,18 @@ mod tests {
             s.api.url = "ftp://x.org".to_owned();
         });
         assert_eq!(problems.len(), 5);
+    }
+
+    #[test]
+    fn the_hub_address_must_be_https_unless_it_is_this_machine() {
+        let url = |text: &str| problems_with(|s| s.api.url = text.to_owned());
+        assert_eq!(url(""), NO_PROBLEMS, "no server is allowed");
+        assert_eq!(url("https://hub.example.org"), NO_PROBLEMS);
+        assert_eq!(url("http://localhost:8088"), NO_PROBLEMS);
+        assert_eq!(
+            url("http://10.0.2.2:8088"),
+            [Problem::ApiUrlNotSecure("http://10.0.2.2:8088".to_owned())]
+        );
     }
 
     #[test]
