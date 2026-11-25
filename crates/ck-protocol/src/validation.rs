@@ -75,6 +75,8 @@ pub enum Problem {
     WifiPasswordInvalid,
     #[error("the machine number must be 1 or more")]
     MachineNumberZero,
+    #[error("the stick token is empty")]
+    TokenEmpty,
     #[error("the computer name would be empty, so the pattern and the team need letters or digits")]
     ComputerNameUnusable,
 }
@@ -152,6 +154,10 @@ impl StickConfig {
         }
         if self.machine_number == Some(0) {
             problems.push(Problem::MachineNumberZero);
+        }
+        // HMAC takes an empty key, so an empty token makes every signature forgeable.
+        if self.token.expose().is_empty() {
+            problems.push(Problem::TokenEmpty);
         }
         problems.extend(self.settings.validate());
         // The pattern may be fine on its own and still give nothing for this team and site.
@@ -433,6 +439,10 @@ mod tests {
         config.schema = 0;
         assert_eq!(config.validate(), [Problem::UnsupportedSchema(0)]);
         config.schema = SCHEMA;
+
+        config.token = Token::new("");
+        assert_eq!(config.validate(), [Problem::TokenEmpty]);
+        config.token = Token::new("t");
 
         config.machine_number = Some(0);
         assert_eq!(config.validate(), [Problem::MachineNumberZero]);
