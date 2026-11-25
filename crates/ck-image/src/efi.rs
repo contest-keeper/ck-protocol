@@ -100,7 +100,8 @@ fn repair_dot_entries(image: &Path) -> Result<(), Error> {
         .map_err(|source| Error::io(format!("opening {}", image.display()), source))?;
     let partitions = read_partitions(&mut file)?;
     let efi = find_efi(&partitions)?;
-    dot_entries::repair(&mut file, efi.start_byte(), efi.end_byte())
+    // Directories skipped as damaged are not an error: the file is already written.
+    dot_entries::repair(&mut file, efi.start_byte(), efi.end_byte()).map(|_skipped| ())
 }
 
 pub fn read_file(image: &Path, path: &str) -> Result<Vec<u8>, Error> {

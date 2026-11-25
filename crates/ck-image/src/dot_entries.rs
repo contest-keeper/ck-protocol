@@ -26,12 +26,18 @@ const MAX_DEPTH: usize = 16;
 const MAX_CLUSTER_BYTES: u64 = 64 * 1024;
 
 /// Fixes every directory of the FAT32 volume that starts at byte `base` of `file`.
-pub(crate) fn repair(file: &mut File, base: u64, end: u64) -> Result<(), Error> {
+///
+/// Returns how many directories were left alone because their clusters lie outside the partition,
+/// so a caller can tell a damaged volume from a repaired one. Those are not errors: the file the
+/// caller wrote is already on disk.
+pub(crate) fn repair(file: &mut File, base: u64, end: u64) -> Result<usize, Error> {
     let Some(volume) = Volume::read(file, base, end)? else {
-        return Ok(());
+        return Ok(0);
     };
     let mut seen = HashSet::new();
-    repair_directory(file, &volume, volume.root, 0, 0, &mut seen)
+    let mut skipped = 0;
+    repair_directory(file, &volume, volume.root, 0, 0, &mut seen, &mut skipped)?;
+    Ok(skipped)
 }
 
 struct Volume {
@@ -89,7 +95,12 @@ impl Volume {
     }
 
     fn next(&self, file: &mut File, cluster: u32) -> Result<u32, Error> {
-        seek(file, self.fat_start + u64::from(cluster) * 4)?;
+        let position = self.fat_start + u64::from(cluster) * 4;
+        // A chain that points past the partition ends here; reading there would fail the write.
+        if position + 4 > self.end {
+            return Ok(0);
+        }
+        seek(file, position)?;
         let mut raw = [0_u8; 4];
         file.read_exact(&mut raw)
             .map_err(|e| Error::io("reading the FAT", e))?;
@@ -114,15 +125,17 @@ fn repair_directory(
     dot_dot: u32,
     depth: usize,
     seen: &mut HashSet<u32>,
+    skipped: &mut usize,
 ) -> Result<(), Error> {
     if depth > MAX_DEPTH || !seen.insert(cluster) {
         return Ok(());
     }
     let clusters = volume.chain(file, cluster)?;
-    if clusters.is_empty()
-        || clusters.len() > MAX_DIRECTORY_CLUSTERS
-        || !clusters.iter().all(|c| volume.holds(*c))
-    {
+    if clusters.is_empty() || clusters.len() > MAX_DIRECTORY_CLUSTERS {
+        return Ok(());
+    }
+    if !clusters.iter().all(|c| volume.holds(*c)) {
+        *skipped += 1;
         return Ok(());
     }
     let mut bytes = read_clusters(file, volume, &clusters)?;
@@ -141,7 +154,7 @@ fn repair_directory(
     // A child's `..` is 0 when this directory is the root, and this directory's cluster otherwise.
     let parent = if cluster == volume.root { 0 } else { cluster };
     for child in children {
-        repair_directory(file, volume, child, parent, depth + 1, seen)?;
+        repair_directory(file, volume, child, parent, depth + 1, seen, skipped)?;
     }
     Ok(())
 }
@@ -239,6 +252,8 @@ fn seek(file: &mut File, position: u64) -> Result<(), Error> {
 
 #[cfg(test)]
 mod tests {
+    use std::fs::OpenOptions;
+
     use super::*;
 
     fn entry(name: &[u8; 11], attr: u8, cluster: u32) -> [u8; ENTRY] {
@@ -330,25 +345,54 @@ mod tests {
     fn leaves_a_directory_outside_the_partition_alone() {
         let image = image_with_root_at(200, 512, 1);
         let before = std::fs::read(image.path()).unwrap();
-        let mut file = std::fs::OpenOptions::new()
+        let mut file = OpenOptions::new()
             .read(true)
             .write(true)
             .open(image.path())
             .unwrap();
-        repair(&mut file, 0, 64 * 1024).unwrap();
+        assert_eq!(repair(&mut file, 0, 64 * 1024).unwrap(), 1);
         assert_eq!(std::fs::read(image.path()).unwrap(), before);
+    }
+
+    #[test]
+    fn leaves_a_directory_whose_second_cluster_is_outside_the_partition_alone() {
+        let image = image_with_root_at(2, 512, 1);
+        // FAT entry of cluster 2 (the FAT starts at byte 512) points to cluster 200, which is
+        // past the 64 KiB partition but inside the file.
+        let mut disk = std::fs::read(image.path()).unwrap();
+        disk[520..524].copy_from_slice(&200_u32.to_le_bytes());
+        std::fs::write(image.path(), &disk).unwrap();
+        let mut file = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(image.path())
+            .unwrap();
+        assert_eq!(repair(&mut file, 0, 64 * 1024).unwrap(), 1);
+        assert_eq!(std::fs::read(image.path()).unwrap(), disk);
+    }
+
+    #[test]
+    fn a_fat_entry_past_the_partition_ends_the_chain_without_an_error() {
+        // Root cluster 400000: its FAT entry is at byte 1.6 MB, past the partition and the file.
+        let image = image_with_root_at(400_000, 512, 1);
+        let mut file = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(image.path())
+            .unwrap();
+        assert_eq!(repair(&mut file, 0, 64 * 1024).unwrap(), 1);
     }
 
     #[test]
     fn repairs_a_directory_inside_the_partition() {
         let image = image_with_root_at(2, 512, 1);
         let before = std::fs::read(image.path()).unwrap();
-        let mut file = std::fs::OpenOptions::new()
+        let mut file = OpenOptions::new()
             .read(true)
             .write(true)
             .open(image.path())
             .unwrap();
-        repair(&mut file, 0, 64 * 1024).unwrap();
+        assert_eq!(repair(&mut file, 0, 64 * 1024).unwrap(), 0);
         assert_ne!(std::fs::read(image.path()).unwrap(), before);
     }
 
