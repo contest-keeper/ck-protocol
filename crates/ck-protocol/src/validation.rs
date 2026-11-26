@@ -178,15 +178,15 @@ impl StickConfig {
 /// A crypt hash: `$id$...` with no spaces, colons or control characters, so it fits one field of
 /// the `chpasswd -e` input. Plain text and empty values are refused.
 fn is_valid_password_hash(hash: &str) -> bool {
-    let mut parts = hash.split('$');
-    let starts_with_dollar = parts.next() == Some("");
-    let has_id = parts.next().is_some_and(|id| !id.is_empty());
-    // `$6$` or `$6$$` would pass chpasswd and then no password would ever match.
-    let has_salt_and_hash = parts.next().is_some_and(|salt| !salt.is_empty())
-        && parts.next().is_some_and(|hash| !hash.is_empty());
+    // `$id$salt$hash`, with optional parameters (`$6$rounds=5000$salt$hash`, `$y$j9T$salt$hash`).
+    // Every field must have text: an empty salt or an empty final hash would pass chpasswd and
+    // then no password would ever match.
+    let mut fields = hash.split('$');
+    let starts_with_dollar = fields.next() == Some("");
+    let rest: Vec<&str> = fields.collect();
     starts_with_dollar
-        && has_id
-        && has_salt_and_hash
+        && rest.len() >= 3
+        && rest.iter().all(|field| !field.is_empty())
         && hash.len() <= 256
         && hash.chars().all(|c| c.is_ascii_graphic() && c != ':')
 }
@@ -419,6 +419,7 @@ mod tests {
         let hash = |text: &str| problems_with(|s| s.admin_password_hash = Some(text.to_owned()));
         assert_eq!(hash("$6$salt$abcdef"), NO_PROBLEMS);
         assert_eq!(hash("$y$j9T$salt$abcdef"), NO_PROBLEMS);
+        assert_eq!(hash("$6$rounds=5000$salt$abcdef"), NO_PROBLEMS);
         for bad in [
             "",
             "plain-password",
@@ -428,6 +429,8 @@ mod tests {
             "$6$",
             "$6$$",
             "$6$salt$",
+            "$6$rounds=5000$salt$",
+            "$y$j9T$salt$",
             "$6$a b$c",
             "$6$a:b$c",
         ] {
