@@ -1,6 +1,6 @@
 //! Checks on the settings, with problems described in plain words for the admin.
 
-use crate::api::is_valid_http_url;
+use crate::api::{is_valid_http_url, is_valid_hub_url};
 use crate::branding::{Branding, COMPUTER_NAME_PLACEHOLDERS};
 use crate::network::is_valid_domain;
 use crate::settings::{LEGACY_SCHEMA, SCHEMA, Settings, StickConfig};
@@ -57,6 +57,8 @@ pub enum Problem {
     AdminPasswordHashInvalid,
     #[error("the server address must start with http:// or https:// (got '{0}')")]
     ApiUrlInvalid(String),
+    #[error("the server address must use https:// (http:// only for localhost), got '{0}'")]
+    ApiUrlNotSecure(String),
     #[error("the heartbeat interval must be at least 1 second")]
     HeartbeatIntervalZero,
     #[error(
@@ -75,6 +77,8 @@ pub enum Problem {
     WifiPasswordInvalid,
     #[error("the machine number must be 1 or more")]
     MachineNumberZero,
+    #[error("the stick token is empty")]
+    TokenEmpty,
     #[error("the computer name would be empty, so the pattern and the team need letters or digits")]
     ComputerNameUnusable,
 }
@@ -120,8 +124,13 @@ impl Settings {
             problems.push(Problem::AdminPasswordHashInvalid);
         }
 
-        if !self.api.url.is_empty() && !is_valid_http_url(&self.api.url) {
-            problems.push(Problem::ApiUrlInvalid(self.api.url.clone()));
+        if !self.api.url.is_empty() {
+            if !is_valid_http_url(&self.api.url) {
+                problems.push(Problem::ApiUrlInvalid(self.api.url.clone()));
+            } else if !is_valid_hub_url(&self.api.url) {
+                // The agent sends the enrolment code only over https or to this machine.
+                problems.push(Problem::ApiUrlNotSecure(self.api.url.clone()));
+            }
         }
         if self.api.heartbeat_s == 0 {
             problems.push(Problem::HeartbeatIntervalZero);
@@ -153,6 +162,10 @@ impl StickConfig {
         if self.machine_number == Some(0) {
             problems.push(Problem::MachineNumberZero);
         }
+        // HMAC takes an empty key, so an empty token makes every signature forgeable.
+        if self.token.expose().is_empty() {
+            problems.push(Problem::TokenEmpty);
+        }
         problems.extend(self.settings.validate());
         // The pattern may be fine on its own and still give nothing for this team and site.
         if self.computer_name().is_empty() {
@@ -165,11 +178,15 @@ impl StickConfig {
 /// A crypt hash: `$id$...` with no spaces, colons or control characters, so it fits one field of
 /// the `chpasswd -e` input. Plain text and empty values are refused.
 fn is_valid_password_hash(hash: &str) -> bool {
-    let mut parts = hash.split('$');
-    let starts_with_dollar = parts.next() == Some("");
-    let has_id_and_rest = parts.next().is_some_and(|id| !id.is_empty()) && parts.next().is_some();
+    // `$id$salt$hash`, with optional parameters (`$6$rounds=5000$salt$hash`, `$y$j9T$salt$hash`).
+    // Every field must have text: an empty salt or an empty final hash would pass chpasswd and
+    // then no password would ever match.
+    let mut fields = hash.split('$');
+    let starts_with_dollar = fields.next() == Some("");
+    let rest: Vec<&str> = fields.collect();
     starts_with_dollar
-        && has_id_and_rest
+        && rest.len() >= 3
+        && rest.iter().all(|field| !field.is_empty())
         && hash.len() <= 256
         && hash.chars().all(|c| c.is_ascii_graphic() && c != ':')
 }
@@ -338,6 +355,18 @@ mod tests {
     }
 
     #[test]
+    fn the_hub_address_must_be_https_unless_it_is_this_machine() {
+        let url = |text: &str| problems_with(|s| s.api.url = text.to_owned());
+        assert_eq!(url(""), NO_PROBLEMS, "no server is allowed");
+        assert_eq!(url("https://hub.example.org"), NO_PROBLEMS);
+        assert_eq!(url("http://localhost:8088"), NO_PROBLEMS);
+        assert_eq!(
+            url("http://10.0.2.2:8088"),
+            [Problem::ApiUrlNotSecure("http://10.0.2.2:8088".to_owned())]
+        );
+    }
+
+    #[test]
     fn a_wallpaper_name_cannot_reach_another_drive_or_stream() {
         for name in [
             "C:wall.png",
@@ -390,12 +419,18 @@ mod tests {
         let hash = |text: &str| problems_with(|s| s.admin_password_hash = Some(text.to_owned()));
         assert_eq!(hash("$6$salt$abcdef"), NO_PROBLEMS);
         assert_eq!(hash("$y$j9T$salt$abcdef"), NO_PROBLEMS);
+        assert_eq!(hash("$6$rounds=5000$salt$abcdef"), NO_PROBLEMS);
         for bad in [
             "",
             "plain-password",
             "$",
             "$6",
             "$$x",
+            "$6$",
+            "$6$$",
+            "$6$salt$",
+            "$6$rounds=5000$salt$",
+            "$y$j9T$salt$",
             "$6$a b$c",
             "$6$a:b$c",
         ] {
@@ -426,6 +461,10 @@ mod tests {
         config.schema = 0;
         assert_eq!(config.validate(), [Problem::UnsupportedSchema(0)]);
         config.schema = SCHEMA;
+
+        config.token = Token::new("");
+        assert_eq!(config.validate(), [Problem::TokenEmpty]);
+        config.token = Token::new("t");
 
         config.machine_number = Some(0);
         assert_eq!(config.validate(), [Problem::MachineNumberZero]);

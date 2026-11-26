@@ -223,7 +223,7 @@ mod tests {
         "site": "Lab 1",
         "allowed_domains": [".cppreference.com", ".judge.example.org"],
         "recording": {"mode": "low", "start_delay_s": 60, "start_at": null},
-        "api": {"url": "http://10.0.2.2:8088", "heartbeat_s": 15},
+        "api": {"url": "https://hub.example.org", "heartbeat_s": 15},
         "added_by_a_newer_version": true
     }"#;
 
@@ -232,7 +232,7 @@ mod tests {
         let config: StickConfig = serde_json::from_str(SAMPLE).expect("valid file");
         assert_eq!(config.stick_id.as_str(), "03c9f556");
         assert_eq!(config.settings.network.allowed_domains.len(), 2);
-        assert_eq!(config.settings.api.url, "http://10.0.2.2:8088");
+        assert_eq!(config.settings.api.url, "https://hub.example.org");
 
         let json = serde_json::to_value(&config).expect("serializes");
         assert!(json.get("allowed_domains").is_some() && json.get("network").is_none());
